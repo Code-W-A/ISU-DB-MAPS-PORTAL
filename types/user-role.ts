@@ -4,4 +4,5 @@ export interface UserRole {
   fullAccess: boolean
   addedBy: string
   addedAt: number
+  allowedTabs?: string[]
 }

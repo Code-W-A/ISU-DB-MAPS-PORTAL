@@ -11,18 +11,31 @@ import { MdDelete, MdAdd } from "react-icons/md"
 import type { UserRole } from "@/types/user-role"
 import { addUserWithFullAccess, removeUserAccess, checkEmailExists } from "@/lib/role-service"
 import { useAuth } from "@/components/auth-provider"
+import { Select } from "@/components/ui/select"
 
 interface UserRoleTableProps {
   initialUsers: UserRole[]
 }
 
+const ALL_TABS = [
+  { value: "users", label: "Utilizatori" },
+  { value: "hydrants", label: "Hidranți" },
+  { value: "reports", label: "Semnalări" },
+  { value: "primarii", label: "Primării" },
+  { value: "seveso", label: "SEVESO" },
+  { value: "data", label: "Import Date" },
+  { value: "settings", label: "Setări" },
+  { value: "legislatie", label: "Legislație" },
+]
+
 export function UserRoleTable({ initialUsers }: UserRoleTableProps) {
   const { user } = useAuth()
   const [users, setUsers] = useState<UserRole[]>(initialUsers)
   const [newUserEmail, setNewUserEmail] = useState("")
+  const [newUserTabs, setNewUserTabs] = useState<string[]>([])
   const [isLoading, setIsLoading] = useState(false)
+  const [updatingUser, setUpdatingUser] = useState<string | null>(null)
 
-  // Modificăm funcția handleAddUser pentru a folosi emailul ca identificator
   const handleAddUser = async (e: React.FormEvent) => {
     e.preventDefault()
 
@@ -35,10 +48,18 @@ export function UserRoleTable({ initialUsers }: UserRoleTableProps) {
       return
     }
 
+    if (newUserTabs.length === 0) {
+      toast({
+        title: "Eroare", 
+        description: "Selectați cel puțin un tab pentru utilizator",
+        variant: "destructive",
+      })
+      return
+    }
+
     setIsLoading(true)
 
     try {
-      // Verificăm dacă emailul există deja
       const exists = await checkEmailExists(newUserEmail)
       if (exists) {
         toast({
@@ -50,24 +71,23 @@ export function UserRoleTable({ initialUsers }: UserRoleTableProps) {
         return
       }
 
-      // Folosim emailul ca identificator unic
       const tempUid = newUserEmail
 
-      // Adăugăm utilizatorul
-      const success = await addUserWithFullAccess(tempUid, newUserEmail, user?.email || "admin")
+      const success = await addUserWithFullAccess(tempUid, newUserEmail, user?.email || "admin", newUserTabs)
 
       if (success) {
-        // Adăugăm utilizatorul în lista locală
         const newUser: UserRole = {
           uid: tempUid,
           email: newUserEmail,
           fullAccess: true,
           addedBy: user?.email || "admin",
           addedAt: Date.now(),
+          allowedTabs: newUserTabs,
         }
 
         setUsers([...users, newUser])
         setNewUserEmail("")
+        setNewUserTabs([])
 
         toast({
           title: "Succes",
@@ -99,7 +119,6 @@ export function UserRoleTable({ initialUsers }: UserRoleTableProps) {
       const success = await removeUserAccess(uid)
 
       if (success) {
-        // Eliminăm utilizatorul din lista locală
         setUsers(users.filter((user) => user.uid !== uid))
 
         toast({
@@ -125,50 +144,157 @@ export function UserRoleTable({ initialUsers }: UserRoleTableProps) {
     setIsLoading(false)
   }
 
+  const handleTabsChange = async (uid: string, allowedTabs: string[]) => {
+    setUsers(users.map(u => u.uid === uid ? { ...u, allowedTabs } : u))
+    setUpdatingUser(uid)
+    
+    try {
+      const userEmail = users.find(u => u.uid === uid)?.email || uid
+      await addUserWithFullAccess(uid, userEmail, user?.email || "admin", allowedTabs)
+      
+      toast({ 
+        title: "Succes",
+        description: "Permisiunile au fost actualizate"
+      })
+    } catch (error) {
+      const originalUser = users.find(u => u.uid === uid)
+      if (originalUser) {
+        setUsers(users.map(u => u.uid === uid ? originalUser : u))
+      }
+      
+      toast({ 
+        title: "Eroare", 
+        description: "Nu s-au putut actualiza permisiunile",
+        variant: "destructive" 
+      })
+    } finally {
+      setUpdatingUser(null)
+    }
+  }
+
   return (
     <div className="space-y-4">
-      <form onSubmit={handleAddUser} className="flex items-center gap-2">
-        <Input
-          type="email"
-          placeholder="Adaugă email utilizator"
-          value={newUserEmail}
-          onChange={(e) => setNewUserEmail(e.target.value)}
-          className="flex-1"
-          disabled={isLoading}
-        />
-        <Button type="submit" disabled={isLoading}>
-          <MdAdd className="mr-2" /> Adaugă
-        </Button>
-      </form>
+      {user?.email === "radu.p1995@yahoo.com" && (
+        <form onSubmit={handleAddUser} className="flex flex-col md:flex-row items-start gap-4 p-4 border rounded-lg bg-gray-50">
+          <div className="flex-1">
+            <Input
+              type="email"
+              placeholder="Adaugă email utilizator"
+              value={newUserEmail}
+              onChange={(e) => setNewUserEmail(e.target.value)}
+              disabled={isLoading}
+            />
+          </div>
+          
+          <div className="flex-2">
+            <p className="text-sm font-medium mb-2">Selectează taburile permise:</p>
+            <div className="grid grid-cols-2 md:grid-cols-4 gap-2">
+              {ALL_TABS.map(tab => (
+                <label key={tab.value} className="flex items-center gap-2 text-sm cursor-pointer">
+                  <input
+                    type="checkbox"
+                    checked={newUserTabs.includes(tab.value)}
+                    onChange={e => {
+                      if (e.target.checked) {
+                        setNewUserTabs([...newUserTabs, tab.value])
+                      } else {
+                        setNewUserTabs(newUserTabs.filter(t => t !== tab.value))
+                      }
+                    }}
+                    disabled={isLoading}
+                    className="rounded"
+                  />
+                  {tab.label}
+                </label>
+              ))}
+            </div>
+          </div>
+          
+          <Button type="submit" disabled={isLoading || newUserTabs.length === 0}>
+            <MdAdd className="mr-2" /> Adaugă
+          </Button>
+        </form>
+      )}
 
-      <div className="border rounded-md">
+      <div className="border rounded-md overflow-x-auto">
         <Table>
           <TableHeader>
             <TableRow>
               <TableHead>Email</TableHead>
               <TableHead>Adăugat de</TableHead>
               <TableHead>Data adăugării</TableHead>
-              <TableHead className="w-[100px]">Acțiuni</TableHead>
+              <TableHead>Taburi permise</TableHead>
+              {user?.email === "radu.p1995@yahoo.com" && <TableHead className="w-[100px]">Acțiuni</TableHead>}
             </TableRow>
           </TableHeader>
           <TableBody>
             {users.length === 0 ? (
               <TableRow>
-                <TableCell colSpan={4} className="text-center py-4 text-muted-foreground">
-                  Nu există utilizatori cu acces complet
+                <TableCell colSpan={user?.email === "radu.p1995@yahoo.com" ? 5 : 4} className="text-center py-4 text-muted-foreground">
+                  Nu există utilizatori cu acces la dashboard
                 </TableCell>
               </TableRow>
             ) : (
-              users.map((user) => (
-                <TableRow key={user.uid}>
-                  <TableCell>{user.email}</TableCell>
-                  <TableCell>{user.addedBy}</TableCell>
-                  <TableCell>{new Date(user.addedAt).toLocaleString()}</TableCell>
+              users.map((u) => (
+                <TableRow key={u.uid}>
+                  <TableCell className="font-medium">{u.email}</TableCell>
+                  <TableCell className="text-sm text-gray-600">{u.addedBy}</TableCell>
+                  <TableCell className="text-sm text-gray-600">{new Date(u.addedAt).toLocaleString()}</TableCell>
                   <TableCell>
-                    <Button variant="ghost" size="icon" onClick={() => handleRemoveUser(user.uid)} disabled={isLoading}>
-                      <MdDelete className="text-red-500" />
-                    </Button>
+                    {user?.email === "radu.p1995@yahoo.com" ? (
+                      <div className="grid grid-cols-2 gap-2 max-w-md">
+                        {ALL_TABS.map(tab => (
+                          <label key={tab.value} className="flex items-center gap-2 text-xs cursor-pointer">
+                            <input
+                              type="checkbox"
+                              checked={u.allowedTabs ? u.allowedTabs.includes(tab.value) : false}
+                              onChange={e => {
+                                const currentTabs = u.allowedTabs || []
+                                let newTabs: string[]
+                                
+                                if (e.target.checked) {
+                                  newTabs = [...currentTabs, tab.value]
+                                } else {
+                                  newTabs = currentTabs.filter(t => t !== tab.value)
+                                }
+                                
+                                handleTabsChange(u.uid, newTabs)
+                              }}
+                              disabled={updatingUser === u.uid}
+                              className="rounded"
+                            />
+                            <span className={updatingUser === u.uid ? "opacity-50" : ""}>
+                              {tab.label}
+                            </span>
+                          </label>
+                        ))}
+                      </div>
+                    ) : (
+                      <div className="flex flex-wrap gap-1">
+                        {(u.allowedTabs || []).length > 0 ? (
+                          u.allowedTabs?.map(tab => (
+                            <span key={tab} className="bg-blue-100 text-blue-800 text-xs px-2 py-1 rounded-full">
+                              {ALL_TABS.find(t => t.value === tab)?.label || tab}
+                            </span>
+                          ))
+                        ) : (
+                          <span className="text-xs text-gray-500 italic">Niciun tab permis</span>
+                        )}
+                      </div>
+                    )}
                   </TableCell>
+                  {user?.email === "radu.p1995@yahoo.com" && (
+                    <TableCell>
+                      <Button 
+                        variant="ghost" 
+                        size="icon" 
+                        onClick={() => handleRemoveUser(u.uid)} 
+                        disabled={isLoading || updatingUser === u.uid}
+                      >
+                        <MdDelete className="text-red-500" />
+                      </Button>
+                    </TableCell>
+                  )}
                 </TableRow>
               ))
             )}

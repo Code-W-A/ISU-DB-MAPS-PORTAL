@@ -44,8 +44,8 @@ export async function getAllUsers(): Promise<UserRole[]> {
   }
 }
 
-// Adaugă sau actualizează un utilizator cu acces complet
-export async function addUserWithFullAccess(uid: string, email: string, addedBy: string): Promise<boolean> {
+// Adaugă sau actualizează un utilizator cu acces complet și taburi permise
+export async function addUserWithFullAccess(uid: string, email: string, addedBy: string, allowedTabs?: string[]): Promise<boolean> {
   try {
     const userData: UserRole = {
       uid,
@@ -53,6 +53,7 @@ export async function addUserWithFullAccess(uid: string, email: string, addedBy:
       fullAccess: true,
       addedBy,
       addedAt: Date.now(),
+      ...(allowedTabs ? { allowedTabs } : {}),
     }
 
     await setDoc(doc(db, USERS_COLLECTION, uid), userData)
