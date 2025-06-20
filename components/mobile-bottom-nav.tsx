@@ -130,8 +130,10 @@ function MobileBottomNavComponent({
           onClick={onTogglePolygonControls}
           type="button"
         >
-          <MdLayers size={24} />
-          <span className="sr-only">Raioane</span>
+          <div className="flex flex-col items-center">
+            <MdLayers size={20} />
+            <span className="text-[10px] mt-1">Raioane</span>
+          </div>
         </Button>
 
         {/* Dashboard Button - Only shown if user is admin */}
