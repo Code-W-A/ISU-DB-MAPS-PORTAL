@@ -1,7 +1,16 @@
 import { useState, useEffect, useRef } from "react"
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card"
 import { Button } from "@/components/ui/button"
-import { MdFolder, MdArrowBack, MdPictureAsPdf, MdClose, MdFullscreen, MdFullscreenExit, MdZoomIn, MdZoomOut, MdRefresh } from "react-icons/md"
+import { MdFolder, MdArrowBack, MdPictureAsPdf, MdClose, MdFullscreen, MdFullscreenExit, MdZoomIn, MdZoomOut, MdRefresh, MdNavigateBefore, MdNavigateNext } from "react-icons/md"
+import { useMobile } from "@/hooks/use-mobile"
+
+// Import PDF viewer pentru mobile
+import { Document, Page, pdfjs } from 'react-pdf'
+import 'react-pdf/dist/Page/AnnotationLayer.css'
+import 'react-pdf/dist/Page/TextLayer.css'
+
+// Configurare PDF.js worker
+pdfjs.GlobalWorkerOptions.workerSrc = `//unpkg.com/pdfjs-dist@${pdfjs.version}/build/pdf.worker.min.js`
 
 // Structură de foldere și documente legislative
 const legislatieData = [
@@ -78,6 +87,15 @@ export function LegislatieTab() {
   const [zoomLevel, setZoomLevel] = useState(100)
   const viewerRef = useRef<HTMLDivElement>(null)
 
+  // Mobile PDF viewer state
+  const [numPages, setNumPages] = useState<number>(0)
+  const [pageNumber, setPageNumber] = useState<number>(1)
+  const [scale, setScale] = useState<number>(1.0)
+  const [isLoading, setIsLoading] = useState<boolean>(false)
+  
+  // Detect mobile device
+  const { isMobile } = useMobile()
+
   const folder = legislatieData.find((f) => f.id === selectedFolder)
 
   // Keyboard shortcuts
@@ -129,12 +147,15 @@ export function LegislatieTab() {
   const handleDocumentClick = (doc: { id: string; name: string; url: string; size?: string }) => {
     setSelectedDocument({ name: doc.name, url: doc.url, size: doc.size })
     setZoomLevel(100)
+    resetMobileViewer()
+    setIsLoading(true)
   }
 
   const handleCloseViewer = () => {
     setSelectedDocument(null)
     setIsFullscreen(false)
     setZoomLevel(100)
+    resetMobileViewer()
   }
 
   const handleBackToFolders = () => {
@@ -142,6 +163,7 @@ export function LegislatieTab() {
     setSelectedDocument(null)
     setIsFullscreen(false)
     setZoomLevel(100)
+    resetMobileViewer()
   }
 
   const toggleFullscreen = () => {
@@ -177,7 +199,194 @@ export function LegislatieTab() {
     }
   }
 
+  // Mobile PDF viewer functions
+  const onDocumentLoadSuccess = ({ numPages }: { numPages: number }) => {
+    setNumPages(numPages)
+    setPageNumber(1)
+    setIsLoading(false)
+  }
+
+  const onDocumentLoadError = (error: Error) => {
+    console.error('Error loading PDF:', error)
+    setIsLoading(false)
+  }
+
+  const goToPrevPage = () => {
+    setPageNumber(prev => Math.max(prev - 1, 1))
+  }
+
+  const goToNextPage = () => {
+    setPageNumber(prev => Math.min(prev + 1, numPages))
+  }
+
+  const handleScaleChange = (newScale: number) => {
+    setScale(Math.max(0.5, Math.min(3.0, newScale)))
+  }
+
+  const resetMobileViewer = () => {
+    setPageNumber(1)
+    setNumPages(0)
+    setScale(1.0)
+    setIsLoading(false)
+  }
+
   if (selectedDocument) {
+    // Mobile PDF Viewer
+    if (isMobile) {
+      return (
+        <div className="space-y-4 px-2 md:px-4 lg:px-6">
+          {/* Header pentru mobile */}
+          <div className="flex flex-col gap-4 bg-gray-50 p-4 rounded-lg border">
+            <div className="flex items-center justify-between">
+              <Button variant="ghost" size="sm" className="flex items-center gap-2" onClick={handleCloseViewer}>
+                <MdArrowBack className="h-4 w-4" /> Înapoi
+              </Button>
+              <div className="text-xs text-gray-600">
+                PDF Viewer Mobile
+              </div>
+            </div>
+            
+            <div className="flex items-center gap-2 text-sm">
+              <MdPictureAsPdf className="h-5 w-5 text-red-600" />
+              <span className="truncate flex-1">{selectedDocument.name}</span>
+            </div>
+          </div>
+
+          {/* Controale pentru mobile */}
+          <div className="flex flex-wrap items-center justify-between gap-2 bg-white p-3 rounded-lg border shadow-sm">
+            <div className="flex items-center gap-2">
+              <Button 
+                variant="outline" 
+                size="sm" 
+                onClick={goToPrevPage} 
+                disabled={pageNumber <= 1}
+                className="h-8 px-2"
+              >
+                <MdNavigateBefore className="h-4 w-4" />
+              </Button>
+              <span className="text-sm font-medium min-w-[80px] text-center">
+                {numPages > 0 ? `${pageNumber} / ${numPages}` : 'Loading...'}
+              </span>
+              <Button 
+                variant="outline" 
+                size="sm" 
+                onClick={goToNextPage} 
+                disabled={pageNumber >= numPages}
+                className="h-8 px-2"
+              >
+                <MdNavigateNext className="h-4 w-4" />
+              </Button>
+            </div>
+            
+            <div className="flex items-center gap-1">
+              <Button 
+                variant="outline" 
+                size="sm" 
+                onClick={() => handleScaleChange(scale - 0.2)} 
+                disabled={scale <= 0.5}
+                className="h-8 px-2"
+              >
+                <MdZoomOut className="h-3 w-3" />
+              </Button>
+              <span className="text-xs min-w-[50px] text-center">
+                {Math.round(scale * 100)}%
+              </span>
+              <Button 
+                variant="outline" 
+                size="sm" 
+                onClick={() => handleScaleChange(scale + 0.2)} 
+                disabled={scale >= 3.0}
+                className="h-8 px-2"
+              >
+                <MdZoomIn className="h-3 w-3" />
+              </Button>
+            </div>
+          </div>
+
+          {/* PDF Document pentru mobile */}
+          <Card className="overflow-hidden">
+            <CardContent className="p-0">
+              <div className="bg-gray-100 min-h-[500px] flex flex-col items-center">
+                {isLoading && (
+                  <div className="flex flex-col items-center justify-center h-64">
+                    <div className="animate-spin rounded-full h-8 w-8 border-b-2 border-blue-600 mb-4"></div>
+                    <p className="text-gray-600 text-sm">Se încarcă PDF-ul...</p>
+                  </div>
+                )}
+                
+                <Document
+                  file={selectedDocument.url}
+                  onLoadSuccess={onDocumentLoadSuccess}
+                  onLoadError={onDocumentLoadError}
+                  loading={
+                    <div className="flex flex-col items-center justify-center h-64">
+                      <div className="animate-spin rounded-full h-8 w-8 border-b-2 border-blue-600 mb-4"></div>
+                      <p className="text-gray-600 text-sm">Se încarcă PDF-ul...</p>
+                    </div>
+                  }
+                  error={
+                    <div className="flex flex-col items-center justify-center h-64 p-4">
+                      <MdPictureAsPdf className="h-12 w-12 text-red-400 mb-4" />
+                      <p className="text-gray-600 text-sm text-center mb-4">
+                        Nu s-a putut încărca PDF-ul în viewer-ul intern.
+                      </p>
+                      <div className="flex gap-2">
+                        <Button variant="outline" size="sm" asChild>
+                          <a href={selectedDocument.url} target="_blank" rel="noopener noreferrer">
+                            Deschide în browser
+                          </a>
+                        </Button>
+                        <Button variant="outline" size="sm" asChild>
+                          <a href={selectedDocument.url} download>
+                            Descarcă
+                          </a>
+                        </Button>
+                      </div>
+                    </div>
+                  }
+                  className="w-full"
+                >
+                  <Page
+                    pageNumber={pageNumber}
+                    scale={scale}
+                    width={Math.min(window.innerWidth - 32, 800)}
+                    renderTextLayer={true}
+                    renderAnnotationLayer={true}
+                    className="shadow-lg mx-auto"
+                  />
+                </Document>
+              </div>
+            </CardContent>
+          </Card>
+
+          {/* Footer cu opțiuni suplimentare pentru mobile */}
+          <div className="bg-gray-50 p-3 rounded-lg text-center">
+            <div className="text-xs text-gray-600 space-y-2">
+              <p>Viewer PDF optimizat pentru mobile</p>
+              <div className="flex justify-center gap-4">
+                <a 
+                  href={selectedDocument.url} 
+                  target="_blank" 
+                  rel="noopener noreferrer"
+                  className="text-blue-600 underline hover:text-blue-800"
+                >
+                  Deschide în browser
+                </a>
+                <a 
+                  href={selectedDocument.url} 
+                  download
+                  className="text-blue-600 underline hover:text-blue-800"
+                >
+                  Descarcă PDF
+                </a>
+              </div>
+            </div>
+          </div>
+        </div>
+      )
+    }
+
+    // Desktop PDF Viewer (păstrat neschimbat)
     return (
       <div 
         ref={viewerRef}
@@ -258,9 +467,7 @@ export function LegislatieTab() {
                 <div className="flex items-center gap-2 min-w-0 flex-1">
                   <MdPictureAsPdf className="h-5 w-5 text-red-600 flex-shrink-0" />
                   <span className="truncate text-sm md:text-base">{selectedDocument.name}</span>
-                  {selectedDocument.size && (
-                    <span className="text-xs md:text-sm text-gray-500 ml-2 flex-shrink-0">({selectedDocument.size})</span>
-                  )}
+             
                 </div>
               </CardTitle>
             </CardHeader>
@@ -389,9 +596,7 @@ export function LegislatieTab() {
                         {doc.description && (
                           <p className="text-xs md:text-sm text-gray-600 mt-1 line-clamp-2">{doc.description}</p>
                         )}
-                        {doc.size && (
-                          <p className="text-xs text-gray-500 mt-1">{doc.size}</p>
-                        )}
+                 
                       </div>
                     </div>
                     <div className="flex items-center gap-2 flex-shrink-0 w-full sm:w-auto justify-between sm:justify-end">

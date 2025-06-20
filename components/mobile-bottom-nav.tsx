@@ -131,7 +131,7 @@ function MobileBottomNavComponent({
           type="button"
         >
           <MdLayers size={24} />
-          <span className="sr-only">Afișează/ascunde raioane</span>
+          <span className="sr-only">Raioane</span>
         </Button>
 
         {/* Dashboard Button - Only shown if user is admin */}

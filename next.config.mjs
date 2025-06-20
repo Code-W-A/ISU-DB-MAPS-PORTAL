@@ -12,6 +12,13 @@ const nextConfig = {
     domains: ['hebbkx1anhila5yf.public.blob.vercel-storage.com'],
     unoptimized: true,
   },
+  webpack: (config, { buildId, dev, isServer, defaultLoaders, webpack }) => {
+    // Configurare pentru react-pdf
+    config.resolve.alias.canvas = false
+    config.resolve.alias.encoding = false
+    
+    return config
+  },
   // Asigură-te că service worker-ul și manifestul sunt servite corect
   async headers() {
     return [
@@ -34,6 +41,15 @@ const nextConfig = {
           {
             key: 'Cache-Control',
             value: 'public, max-age=0, must-revalidate',
+          },
+        ],
+      },
+      {
+        source: '/legislatie/:path*',
+        headers: [
+          {
+            key: 'Content-Type',
+            value: 'application/pdf',
           },
         ],
       },
