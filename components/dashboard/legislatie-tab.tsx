@@ -391,7 +391,7 @@ export function LegislatieTab() {
       <div 
         ref={viewerRef}
         className={`transition-all duration-300 ${
-          isFullscreen ? 'fixed inset-0 z-50 bg-white' : 'space-y-4 px-2 md:px-4 lg:px-6'
+          isFullscreen ? 'fixed inset-0 z-50 bg-white' : 'space-y-4 px-2 md:px-4 lg:px-8 xl:px-12'
         }`}
       >
         {/* Header cu controale - doar când nu e fullscreen */}
@@ -460,7 +460,7 @@ export function LegislatieTab() {
           </div>
         )}
 
-        <Card className={isFullscreen ? 'h-screen border-0 rounded-none' : 'max-w-6xl mx-auto'}>
+        <Card className={isFullscreen ? 'h-screen border-0 rounded-none' : 'w-full max-w-[95vw] mx-auto'}>
           {!isFullscreen && (
             <CardHeader className="pb-3 p-4 md:p-6">
               <CardTitle className="flex flex-col sm:flex-row items-start sm:items-center justify-between gap-2">
@@ -474,7 +474,7 @@ export function LegislatieTab() {
           )}
           <CardContent className={isFullscreen ? 'p-0 h-full' : 'p-0'}>
             <div className={`w-full bg-gray-50 relative ${
-              isFullscreen ? 'h-screen' : 'h-[400px] sm:h-[600px] md:h-[800px] border-t'
+              isFullscreen ? 'h-screen' : 'h-[400px] sm:h-[600px] md:h-[700px] lg:h-[800px] xl:h-[900px] border-t'
             }`}>
               <iframe
                 src={`${selectedDocument.url}#toolbar=1&navpanes=1&scrollbar=1&zoom=${zoomLevel}`}
