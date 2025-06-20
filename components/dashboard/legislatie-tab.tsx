@@ -92,11 +92,41 @@ export function LegislatieTab() {
   const [pageNumber, setPageNumber] = useState<number>(1)
   const [scale, setScale] = useState<number>(1.0)
   const [isLoading, setIsLoading] = useState<boolean>(false)
+  const [pdfData, setPdfData] = useState<ArrayBuffer | null>(null)
+  const [pdfError, setPdfError] = useState<string | null>(null)
   
   // Detect mobile device
   const { isMobile } = useMobile()
 
   const folder = legislatieData.find((f) => f.id === selectedFolder)
+
+  // Function to fetch PDF as ArrayBuffer for PWA compatibility
+  const fetchPdfData = async (url: string): Promise<ArrayBuffer | null> => {
+    try {
+      setIsLoading(true)
+      setPdfError(null)
+      
+      const response = await fetch(url, {
+        method: 'GET',
+        headers: {
+          'Accept': 'application/pdf',
+        },
+      })
+      
+      if (!response.ok) {
+        throw new Error(`HTTP error! status: ${response.status}`)
+      }
+      
+      const arrayBuffer = await response.arrayBuffer()
+      return arrayBuffer
+    } catch (error) {
+      console.error('Error fetching PDF:', error)
+      setPdfError(error instanceof Error ? error.message : 'Eroare necunoscută')
+      return null
+    } finally {
+      setIsLoading(false)
+    }
+  }
 
   // Keyboard shortcuts
   useEffect(() => {
@@ -144,11 +174,18 @@ export function LegislatieTab() {
     return () => document.removeEventListener('keydown', handleKeyPress)
   }, [selectedDocument, isFullscreen])
 
-  const handleDocumentClick = (doc: { id: string; name: string; url: string; size?: string }) => {
+  const handleDocumentClick = async (doc: { id: string; name: string; url: string; size?: string }) => {
     setSelectedDocument({ name: doc.name, url: doc.url, size: doc.size })
     setZoomLevel(100)
     resetMobileViewer()
-    setIsLoading(true)
+    
+    // Pentru mobile, fetch PDF data pentru compatibilitate PWA
+    if (isMobile) {
+      const pdfArrayBuffer = await fetchPdfData(doc.url)
+      setPdfData(pdfArrayBuffer)
+    } else {
+      setIsLoading(true)
+    }
   }
 
   const handleCloseViewer = () => {
@@ -204,11 +241,13 @@ export function LegislatieTab() {
     setNumPages(numPages)
     setPageNumber(1)
     setIsLoading(false)
+    setPdfError(null)
   }
 
   const onDocumentLoadError = (error: Error) => {
     console.error('Error loading PDF:', error)
     setIsLoading(false)
+    setPdfError('Nu s-a putut încărca PDF-ul. Încercați să-l deschideți în browser.')
   }
 
   const goToPrevPage = () => {
@@ -228,6 +267,8 @@ export function LegislatieTab() {
     setNumPages(0)
     setScale(1.0)
     setIsLoading(false)
+    setPdfData(null)
+    setPdfError(null)
   }
 
   if (selectedDocument) {
@@ -307,54 +348,66 @@ export function LegislatieTab() {
           <Card className="overflow-hidden">
             <CardContent className="p-0">
               <div className="bg-gray-100 min-h-[500px] flex flex-col items-center">
-                {isLoading && (
+                {(isLoading || (!pdfData && !pdfError)) && (
                   <div className="flex flex-col items-center justify-center h-64">
                     <div className="animate-spin rounded-full h-8 w-8 border-b-2 border-blue-600 mb-4"></div>
-                    <p className="text-gray-600 text-sm">Se încarcă PDF-ul...</p>
+                    <p className="text-gray-600 text-sm">
+                      {isMobile ? 'Se pregătește PDF-ul pentru PWA...' : 'Se încarcă PDF-ul...'}
+                    </p>
+                    <p className="text-gray-500 text-xs mt-2">
+                      Aceasta poate dura câteva secunde
+                    </p>
                   </div>
                 )}
                 
-                <Document
-                  file={selectedDocument.url}
-                  onLoadSuccess={onDocumentLoadSuccess}
-                  onLoadError={onDocumentLoadError}
-                  loading={
-                    <div className="flex flex-col items-center justify-center h-64">
-                      <div className="animate-spin rounded-full h-8 w-8 border-b-2 border-blue-600 mb-4"></div>
-                      <p className="text-gray-600 text-sm">Se încarcă PDF-ul...</p>
-                    </div>
-                  }
-                  error={
-                    <div className="flex flex-col items-center justify-center h-64 p-4">
-                      <MdPictureAsPdf className="h-12 w-12 text-red-400 mb-4" />
-                      <p className="text-gray-600 text-sm text-center mb-4">
-                        Nu s-a putut încărca PDF-ul în viewer-ul intern.
-                      </p>
-                      <div className="flex gap-2">
-                        <Button variant="outline" size="sm" asChild>
-                          <a href={selectedDocument.url} target="_blank" rel="noopener noreferrer">
-                            Deschide în browser
-                          </a>
-                        </Button>
-                        <Button variant="outline" size="sm" asChild>
-                          <a href={selectedDocument.url} download>
-                            Descarcă
-                          </a>
-                        </Button>
+                {(!isLoading && (pdfData || !isMobile)) && (
+                  <Document
+                    file={pdfData || selectedDocument.url}
+                    onLoadSuccess={onDocumentLoadSuccess}
+                    onLoadError={onDocumentLoadError}
+                    loading={
+                      <div className="flex flex-col items-center justify-center h-64">
+                        <div className="animate-spin rounded-full h-8 w-8 border-b-2 border-blue-600 mb-4"></div>
+                        <p className="text-gray-600 text-sm">Se procesează PDF-ul...</p>
                       </div>
-                    </div>
-                  }
-                  className="w-full"
-                >
-                  <Page
-                    pageNumber={pageNumber}
-                    scale={scale}
-                    width={Math.min(window.innerWidth - 32, 800)}
-                    renderTextLayer={true}
-                    renderAnnotationLayer={true}
-                    className="shadow-lg mx-auto"
-                  />
-                </Document>
+                    }
+                    error={
+                      <div className="flex flex-col items-center justify-center h-64 p-4">
+                        <MdPictureAsPdf className="h-12 w-12 text-red-400 mb-4" />
+                        <p className="text-gray-600 text-sm text-center mb-4">
+                          {pdfError || "Nu s-a putut încărca PDF-ul în viewer-ul intern."}
+                        </p>
+                        <div className="flex gap-2">
+                          <Button variant="outline" size="sm" asChild>
+                            <a href={selectedDocument.url} target="_blank" rel="noopener noreferrer">
+                              Deschide în browser
+                            </a>
+                          </Button>
+                          <Button variant="outline" size="sm" asChild>
+                            <a href={selectedDocument.url} download>
+                              Descarcă
+                            </a>
+                          </Button>
+                        </div>
+                      </div>
+                    }
+                    options={{
+                      cMapUrl: `https://unpkg.com/pdfjs-dist@${pdfjs.version}/cmaps/`,
+                      cMapPacked: true,
+                      standardFontDataUrl: `https://unpkg.com/pdfjs-dist@${pdfjs.version}/standard_fonts/`,
+                    }}
+                    className="w-full"
+                  >
+                    <Page
+                      pageNumber={pageNumber}
+                      scale={scale}
+                      width={Math.min(window.innerWidth - 32, 800)}
+                      renderTextLayer={true}
+                      renderAnnotationLayer={true}
+                      className="shadow-lg mx-auto"
+                    />
+                  </Document>
+                )}
               </div>
             </CardContent>
           </Card>
