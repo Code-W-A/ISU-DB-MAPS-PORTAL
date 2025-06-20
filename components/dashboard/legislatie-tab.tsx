@@ -94,11 +94,20 @@ export function LegislatieTab() {
   const [isLoading, setIsLoading] = useState<boolean>(false)
   const [pdfData, setPdfData] = useState<ArrayBuffer | null>(null)
   const [pdfError, setPdfError] = useState<string | null>(null)
+  const [debugLogs, setDebugLogs] = useState<string[]>([])
   
   // Detect mobile device
   const { isMobile } = useMobile()
 
   const folder = legislatieData.find((f) => f.id === selectedFolder)
+
+  // Debug logger function
+  const addDebugLog = (message: string) => {
+    const timestamp = new Date().toLocaleTimeString()
+    const logEntry = `[${timestamp}] ${message}`
+    setDebugLogs(prev => [...prev.slice(-4), logEntry]) // Keep last 5 logs
+    console.log(logEntry)
+  }
 
   // Function to get PDF URL (use API proxy for PWA compatibility)
   const getPdfUrl = (originalUrl: string) => {
@@ -119,9 +128,11 @@ export function LegislatieTab() {
     try {
       setIsLoading(true)
       setPdfError(null)
+      addDebugLog(`Începe încărcarea PDF: ${url}`)
       
       // Folosim URL-ul proxy pentru PWA
       const pdfUrl = getPdfUrl(url)
+      addDebugLog(`URL proxy generat: ${pdfUrl}`)
       
       const response = await fetch(pdfUrl, {
         method: 'GET',
@@ -132,15 +143,22 @@ export function LegislatieTab() {
         cache: 'force-cache',
       })
       
+      addDebugLog(`Response status: ${response.status} ${response.statusText}`)
+      
       if (!response.ok) {
-        throw new Error(`HTTP error! status: ${response.status}`)
+        const errorText = await response.text()
+        addDebugLog(`Error response: ${errorText}`)
+        throw new Error(`HTTP error! status: ${response.status} - ${errorText}`)
       }
       
       const arrayBuffer = await response.arrayBuffer()
+      addDebugLog(`PDF încărcat cu succes: ${arrayBuffer.byteLength} bytes`)
       return arrayBuffer
     } catch (error) {
+      const errorMsg = error instanceof Error ? error.message : 'Eroare la încărcarea PDF-ului'
+      addDebugLog(`EROARE: ${errorMsg}`)
       console.error('Error fetching PDF:', error)
-      setPdfError(error instanceof Error ? error.message : 'Eroare la încărcarea PDF-ului')
+      setPdfError(errorMsg)
       return null
     } finally {
       setIsLoading(false)
@@ -261,12 +279,15 @@ export function LegislatieTab() {
     setPageNumber(1)
     setIsLoading(false)
     setPdfError(null)
+    addDebugLog(`PDF încărcat cu succes: ${numPages} pagini`)
   }
 
   const onDocumentLoadError = (error: Error) => {
+    const errorMsg = 'Nu s-a putut încărca PDF-ul. Încercați să-l deschideți în browser.'
+    addDebugLog(`EROARE react-pdf: ${error.message}`)
     console.error('Error loading PDF:', error)
     setIsLoading(false)
-    setPdfError('Nu s-a putut încărca PDF-ul. Încercați să-l deschideți în browser.')
+    setPdfError(errorMsg)
   }
 
   const goToPrevPage = () => {
@@ -436,7 +457,7 @@ export function LegislatieTab() {
           </Card>
 
           {/* Footer cu opțiuni suplimentare pentru mobile */}
-          <div className="bg-gray-50 p-3 rounded-lg text-center">
+          <div className="bg-gray-50 p-3 rounded-lg text-center space-y-3">
             <div className="text-xs text-gray-600 space-y-2">
               <p>Viewer PDF optimizat pentru mobile/PWA</p>
               <p className="text-gray-500">
@@ -469,6 +490,16 @@ export function LegislatieTab() {
                 </a>
               </div>
             </div>
+            
+            {/* Debug Logs Panel */}
+            {debugLogs.length > 0 && (
+              <div className="mt-3 p-2 bg-gray-800 text-green-400 text-xs rounded font-mono text-left max-h-32 overflow-y-auto">
+                <div className="text-green-300 mb-1 font-bold">Debug Logs:</div>
+                {debugLogs.map((log, index) => (
+                  <div key={index} className="break-all">{log}</div>
+                ))}
+              </div>
+            )}
           </div>
         </div>
       )
