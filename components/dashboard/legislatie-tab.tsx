@@ -1,7 +1,7 @@
 import { useState, useEffect, useRef } from "react"
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card"
 import { Button } from "@/components/ui/button"
-import { MdFolder, MdArrowBack, MdPictureAsPdf, MdClose, MdFullscreen, MdFullscreenExit, MdZoomIn, MdZoomOut, MdRefresh, MdNavigateBefore, MdNavigateNext, MdOpenInNew, MdDownload } from "react-icons/md"
+import { MdFolder, MdArrowBack, MdPictureAsPdf, MdClose, MdFullscreen, MdFullscreenExit, MdZoomIn, MdZoomOut, MdRefresh, MdNavigateBefore, MdNavigateNext } from "react-icons/md"
 import { useMobile } from "@/hooks/use-mobile"
 
 // Import PDF viewer pentru mobile
@@ -9,15 +9,8 @@ import { Document, Page, pdfjs } from 'react-pdf'
 import 'react-pdf/dist/Page/AnnotationLayer.css'
 import 'react-pdf/dist/Page/TextLayer.css'
 
-// Configurare PDF.js worker pentru PWA compatibility
-if (typeof window !== 'undefined') {
-  // Încercăm să folosim worker-ul standard, dar cu fallback pentru PWA
-  try {
-    pdfjs.GlobalWorkerOptions.workerSrc = `//unpkg.com/pdfjs-dist@${pdfjs.version}/build/pdf.worker.min.js`
-  } catch (error) {
-    console.warn('Failed to set PDF.js worker, falling back to no worker')
-  }
-}
+// Configurare PDF.js worker
+pdfjs.GlobalWorkerOptions.workerSrc = `//unpkg.com/pdfjs-dist@${pdfjs.version}/build/pdf.worker.min.js`
 
 // Structură de foldere și documente legislative
 const legislatieData = [
@@ -94,85 +87,16 @@ export function LegislatieTab() {
   const [zoomLevel, setZoomLevel] = useState(100)
   const viewerRef = useRef<HTMLDivElement>(null)
 
-  // State pentru mobile PDF viewer
+  // Mobile PDF viewer state
   const [numPages, setNumPages] = useState<number>(0)
   const [pageNumber, setPageNumber] = useState<number>(1)
   const [scale, setScale] = useState<number>(1.0)
   const [isLoading, setIsLoading] = useState<boolean>(false)
-  const [pdfData, setPdfData] = useState<ArrayBuffer | null>(null)
-  const [pdfError, setPdfError] = useState<string | null>(null)
-  const [workerRetryCount, setWorkerRetryCount] = useState<number>(0)
-  const [forceRerender, setForceRerender] = useState<number>(0)
-  const [debugLogs, setDebugLogs] = useState<string[]>([])
   
   // Detect mobile device
   const { isMobile } = useMobile()
 
   const folder = legislatieData.find((f) => f.id === selectedFolder)
-
-  // Debug logger function
-  const addDebugLog = (message: string) => {
-    const timestamp = new Date().toLocaleTimeString()
-    const logEntry = `[${timestamp}] ${message}`
-    setDebugLogs(prev => [...prev.slice(-4), logEntry]) // Keep last 5 logs
-    console.log(logEntry)
-  }
-
-  // Function to get PDF URL (use API proxy for PWA compatibility)
-  const getPdfUrl = (originalUrl: string) => {
-    if (typeof window !== 'undefined') {
-      // Pentru PWA și mobile, folosim API proxy
-      const isStandalone = (window.navigator as any).standalone || window.matchMedia('(display-mode: standalone)').matches
-      if (isMobile || isStandalone) {
-        const fileName = originalUrl.split('/').pop()
-        return `/api/pdf-proxy/${fileName}`
-      }
-    }
-    // Pentru desktop, folosim URL-ul original
-    return originalUrl
-  }
-
-  // Function to fetch PDF as ArrayBuffer for PWA compatibility
-  const fetchPdfData = async (url: string): Promise<ArrayBuffer | null> => {
-    try {
-      setIsLoading(true)
-      setPdfError(null)
-      addDebugLog(`Începe încărcarea PDF: ${url}`)
-      
-      // Folosim URL-ul proxy pentru PWA
-      const pdfUrl = getPdfUrl(url)
-      addDebugLog(`URL proxy generat: ${pdfUrl}`)
-      
-      const response = await fetch(pdfUrl, {
-        method: 'GET',
-        headers: {
-          'Accept': 'application/pdf',
-        },
-        // Pentru PWA
-        cache: 'force-cache',
-      })
-      
-      addDebugLog(`Response status: ${response.status} ${response.statusText}`)
-      
-      if (!response.ok) {
-        const errorText = await response.text()
-        addDebugLog(`Error response: ${errorText}`)
-        throw new Error(`HTTP error! status: ${response.status} - ${errorText}`)
-      }
-      
-      const arrayBuffer = await response.arrayBuffer()
-      addDebugLog(`PDF încărcat cu succes: ${arrayBuffer.byteLength} bytes`)
-      return arrayBuffer
-    } catch (error) {
-      const errorMsg = error instanceof Error ? error.message : 'Eroare la încărcarea PDF-ului'
-      addDebugLog(`EROARE: ${errorMsg}`)
-      console.error('Error fetching PDF:', error)
-      setPdfError(errorMsg)
-      return null
-    } finally {
-      setIsLoading(false)
-    }
-  }
 
   // Keyboard shortcuts
   useEffect(() => {
@@ -220,25 +144,11 @@ export function LegislatieTab() {
     return () => document.removeEventListener('keydown', handleKeyPress)
   }, [selectedDocument, isFullscreen])
 
-  const handleDocumentClick = async (doc: { id: string; name: string; url: string; size?: string }) => {
+  const handleDocumentClick = (doc: { id: string; name: string; url: string; size?: string }) => {
     setSelectedDocument({ name: doc.name, url: doc.url, size: doc.size })
     setZoomLevel(100)
     resetMobileViewer()
-    setWorkerRetryCount(0)
-    setForceRerender(0)
-    
-    addDebugLog(`Document selectat: ${doc.name}`)
-    
-    // Pentru mobile, fetch PDF data pentru compatibilitate PWA
-    if (isMobile) {
-      const isPWA = typeof window !== 'undefined' && ((window.navigator as any).standalone || window.matchMedia('(display-mode: standalone)').matches)
-      addDebugLog(`PWA detectat: ${isPWA}`)
-      
-      const pdfArrayBuffer = await fetchPdfData(doc.url)
-      setPdfData(pdfArrayBuffer)
-    } else {
-      setIsLoading(true)
-    }
+    setIsLoading(true)
   }
 
   const handleCloseViewer = () => {
@@ -294,48 +204,11 @@ export function LegislatieTab() {
     setNumPages(numPages)
     setPageNumber(1)
     setIsLoading(false)
-    setPdfError(null)
-    addDebugLog(`PDF încărcat cu succes: ${numPages} pagini`)
   }
 
   const onDocumentLoadError = (error: Error) => {
-    const errorMsg = error.message || 'Eroare necunoscută la încărcarea PDF-ului'
-    addDebugLog(`EROARE react-pdf: ${errorMsg}`)
-    
-    // Dacă eroarea este legată de worker și nu am încercat încă
-    if ((errorMsg.includes('worker') || errorMsg.includes('Worker')) && workerRetryCount < 2) {
-      addDebugLog(`Încercare ${workerRetryCount + 1} fără worker PDF.js...`)
-      
-      try {
-        // Resetăm worker-ul complet
-        pdfjs.GlobalWorkerOptions.workerSrc = ''
-        delete (pdfjs as any).GlobalWorkerOptions.workerPort
-        addDebugLog('Worker dezactivat complet, se reîncearcă...')
-        
-        // Incrementăm retry count și forțăm re-render
-        setWorkerRetryCount(prev => prev + 1)
-        setForceRerender(prev => prev + 1)
-        setPdfError(null)
-        setIsLoading(true)
-        
-        // Re-fetch PDF data pentru a forța reload
-        setTimeout(async () => {
-          if (selectedDocument) {
-            const pdfArrayBuffer = await fetchPdfData(selectedDocument.url)
-            setPdfData(pdfArrayBuffer)
-            addDebugLog('PDF re-încărcat pentru retry fără worker')
-          }
-        }, 100)
-        
-        return // Nu setăm eroarea încă, încercăm din nou
-      } catch (e) {
-        addDebugLog('Nu s-a putut dezactiva worker-ul complet')
-      }
-    }
-    
     console.error('Error loading PDF:', error)
     setIsLoading(false)
-    setPdfError(`${errorMsg}. Încercați să deschideți PDF-ul în browser.`)
   }
 
   const goToPrevPage = () => {
@@ -355,73 +228,6 @@ export function LegislatieTab() {
     setNumPages(0)
     setScale(1.0)
     setIsLoading(false)
-    setPdfData(null)
-    setPdfError(null)
-  }
-
-  // Fallback HTML viewer pentru PWA când react-pdf nu funcționează
-  const renderFallbackViewer = () => {
-    const isPWA = typeof window !== 'undefined' && ((window.navigator as any).standalone || window.matchMedia('(display-mode: standalone)').matches)
-    
-    if (!isPWA || !selectedDocument) return null
-    
-    return (
-      <div className="w-full h-full bg-gray-50 rounded-lg p-4">
-        <div className="text-center mb-4">
-          <MdPictureAsPdf className="h-16 w-16 text-blue-600 mx-auto mb-2" />
-          <h3 className="text-lg font-semibold text-gray-800">{selectedDocument.name}</h3>
-          <p className="text-sm text-gray-600 mt-2">
-            PDF viewer-ul intern nu funcționează în PWA mode.
-          </p>
-        </div>
-        
-        <div className="flex flex-col gap-3">
-          <Button 
-            className="w-full" 
-            asChild
-          >
-            <a 
-              href={getPdfUrl(selectedDocument.url)} 
-              target="_blank" 
-              rel="noopener noreferrer"
-            >
-              <MdOpenInNew className="h-4 w-4 mr-2" />
-              Deschide în browser extern
-            </a>
-          </Button>
-          
-          <Button 
-            variant="outline" 
-            className="w-full" 
-            asChild
-          >
-            <a 
-              href={selectedDocument.url} 
-              download
-            >
-              <MdDownload className="h-4 w-4 mr-2" />
-              Descarcă PDF-ul
-            </a>
-          </Button>
-          
-          <Button 
-            variant="ghost" 
-            className="w-full" 
-            onClick={() => setSelectedDocument(null)}
-          >
-            <MdArrowBack className="h-4 w-4 mr-2" />
-            Înapoi la listă
-          </Button>
-        </div>
-        
-        <div className="mt-4 p-3 bg-blue-50 rounded-lg">
-          <p className="text-xs text-blue-700">
-            💡 <strong>Tip:</strong> Pentru o experiență mai bună cu PDF-urile, 
-            folosiți aplicația în browser-ul web în loc de PWA.
-          </p>
-        </div>
-      </div>
-    )
   }
 
   if (selectedDocument) {
@@ -501,108 +307,62 @@ export function LegislatieTab() {
           <Card className="overflow-hidden">
             <CardContent className="p-0">
               <div className="bg-gray-100 min-h-[500px] flex flex-col items-center">
-                {(isLoading || (!pdfData && !pdfError)) && (
+                {isLoading && (
                   <div className="flex flex-col items-center justify-center h-64">
                     <div className="animate-spin rounded-full h-8 w-8 border-b-2 border-blue-600 mb-4"></div>
-                    <p className="text-gray-600 text-sm">
-                      {isMobile ? 'Se pregătește PDF-ul pentru PWA...' : 'Se încarcă PDF-ul...'}
-                    </p>
-                    <p className="text-gray-500 text-xs mt-2">
-                      Aceasta poate dura câteva secunde
-                    </p>
+                    <p className="text-gray-600 text-sm">Se încarcă PDF-ul...</p>
                   </div>
                 )}
                 
-                {/* Mobile PDF Viewer */}
-                {isMobile && (
-                  <div className="w-full h-full">
-                    {/* Fallback viewer pentru PWA când react-pdf nu funcționează */}
-                    {pdfError && workerRetryCount >= 2 && renderFallbackViewer()}
-                    
-                    {/* React PDF Viewer normal */}
-                    {(!pdfError || workerRetryCount < 2) && (
-                      <>
-                        {isLoading && (
-                          <div className="flex flex-col items-center justify-center h-64">
-                            <div className="animate-spin rounded-full h-8 w-8 border-b-2 border-blue-600 mb-4"></div>
-                            <p className="text-gray-600 text-sm">Se încarcă PDF-ul...</p>
-                          </div>
-                        )}
-                        
-                        {(!isLoading && (pdfData || !isMobile)) && (
-                          <Document
-                            key={`pdf-${forceRerender}-${workerRetryCount}`}
-                            file={pdfData || getPdfUrl(selectedDocument.url)}
-                            onLoadSuccess={onDocumentLoadSuccess}
-                            onLoadError={onDocumentLoadError}
-                            loading={
-                              <div className="flex flex-col items-center justify-center h-64">
-                                <div className="animate-spin rounded-full h-8 w-8 border-b-2 border-blue-600 mb-4"></div>
-                                <p className="text-gray-600 text-sm">Se procesează PDF-ul...</p>
-                              </div>
-                            }
-                            error={
-                              <div className="flex flex-col items-center justify-center h-64 p-4">
-                                <MdPictureAsPdf className="h-12 w-12 text-red-400 mb-4" />
-                                <p className="text-gray-600 text-sm text-center mb-2">
-                                  {pdfError || "Nu s-a putut încărca PDF-ul în viewer-ul intern."}
-                                </p>
-                                <p className="text-gray-500 text-xs text-center mb-4">
-                                  PWA Mode: {isMobile ? 'Da' : 'Nu'} | 
-                                  URL: {getPdfUrl(selectedDocument.url)} |
-                                  Retry: {workerRetryCount}/2
-                                </p>
-                                <div className="flex gap-2">
-                                  <Button variant="outline" size="sm" asChild>
-                                    <a href={selectedDocument.url} target="_blank" rel="noopener noreferrer">
-                                      Deschide în browser
-                                    </a>
-                                  </Button>
-                                  <Button variant="outline" size="sm" asChild>
-                                    <a href={selectedDocument.url} download>
-                                      Descarcă
-                                    </a>
-                                  </Button>
-                                </div>
-                              </div>
-                            }
-                            options={{
-                              // Opțiuni minime pentru PWA compatibility
-                              ...(typeof window !== 'undefined' && {
-                                cMapUrl: `https://unpkg.com/pdfjs-dist@${pdfjs.version}/cmaps/`,
-                                cMapPacked: true,
-                              }),
-                            }}
-                            className="w-full"
-                          >
-                            {Array.from(new Array(numPages), (el, index) => (
-                              <Page
-                                key={`page_${index + 1}`}
-                                pageNumber={index + 1}
-                                width={Math.min(400, window.innerWidth - 40)}
-                                className="mb-4 shadow-lg"
-                              />
-                            ))}
-                          </Document>
-                        )}
-
-
-                      </>
-                    )}
-                  </div>
-                )}
+                <Document
+                  file={selectedDocument.url}
+                  onLoadSuccess={onDocumentLoadSuccess}
+                  onLoadError={onDocumentLoadError}
+                  loading={
+                    <div className="flex flex-col items-center justify-center h-64">
+                      <div className="animate-spin rounded-full h-8 w-8 border-b-2 border-blue-600 mb-4"></div>
+                      <p className="text-gray-600 text-sm">Se încarcă PDF-ul...</p>
+                    </div>
+                  }
+                  error={
+                    <div className="flex flex-col items-center justify-center h-64 p-4">
+                      <MdPictureAsPdf className="h-12 w-12 text-red-400 mb-4" />
+                      <p className="text-gray-600 text-sm text-center mb-4">
+                        Nu s-a putut încărca PDF-ul în viewer-ul intern.
+                      </p>
+                      <div className="flex gap-2">
+                        <Button variant="outline" size="sm" asChild>
+                          <a href={selectedDocument.url} target="_blank" rel="noopener noreferrer">
+                            Deschide în browser
+                          </a>
+                        </Button>
+                        <Button variant="outline" size="sm" asChild>
+                          <a href={selectedDocument.url} download>
+                            Descarcă
+                          </a>
+                        </Button>
+                      </div>
+                    </div>
+                  }
+                  className="w-full"
+                >
+                  <Page
+                    pageNumber={pageNumber}
+                    scale={scale}
+                    width={Math.min(window.innerWidth - 32, 800)}
+                    renderTextLayer={true}
+                    renderAnnotationLayer={true}
+                    className="shadow-lg mx-auto"
+                  />
+                </Document>
               </div>
             </CardContent>
           </Card>
 
           {/* Footer cu opțiuni suplimentare pentru mobile */}
-          <div className="bg-gray-50 p-3 rounded-lg text-center space-y-3">
+          <div className="bg-gray-50 p-3 rounded-lg text-center">
             <div className="text-xs text-gray-600 space-y-2">
-              <p>Viewer PDF optimizat pentru mobile/PWA</p>
-              <p className="text-gray-500">
-                Mode: {isMobile ? 'Mobile' : 'Desktop'} | 
-                PWA: {typeof window !== 'undefined' && ((window.navigator as any).standalone || window.matchMedia('(display-mode: standalone)').matches) ? 'Da' : 'Nu'}
-              </p>
+              <p>Viewer PDF optimizat pentru mobile</p>
               <div className="flex justify-center gap-4">
                 <a 
                   href={selectedDocument.url} 
@@ -619,32 +379,14 @@ export function LegislatieTab() {
                 >
                   Descarcă PDF
                 </a>
-                <a 
-                  href={getPdfUrl(selectedDocument.url)} 
-                  target="_blank" 
-                  rel="noopener noreferrer"
-                  className="text-green-600 underline hover:text-green-800"
-                >
-                  API Proxy
-                </a>
               </div>
             </div>
-            
-            {/* Debug Logs Panel */}
-            {debugLogs.length > 0 && (
-              <div className="mt-3 p-2 bg-gray-800 text-green-400 text-xs rounded font-mono text-left max-h-32 overflow-y-auto">
-                <div className="text-green-300 mb-1 font-bold">Debug Logs:</div>
-                {debugLogs.map((log, index) => (
-                  <div key={index} className="break-all">{log}</div>
-                ))}
-              </div>
-            )}
           </div>
         </div>
       )
     }
 
-    // Desktop PDF Viewer
+    // Desktop PDF Viewer (păstrat neschimbat)
     return (
       <div 
         ref={viewerRef}
@@ -734,28 +476,23 @@ export function LegislatieTab() {
             <div className={`w-full bg-gray-50 relative ${
               isFullscreen ? 'h-screen' : 'h-[400px] sm:h-[600px] md:h-[800px] border-t'
             }`}>
-              {/* Desktop PDF Viewer */}
-              {!isMobile && (
-                <div className="w-full h-full">
-                  {isLoading && (
-                    <div className="flex items-center justify-center h-96">
-                      <div className="animate-spin rounded-full h-8 w-8 border-b-2 border-blue-600"></div>
-                    </div>
-                  )}
-                  
-                  {!isLoading && (
-                    <iframe
-                      src={`${selectedDocument.url}#toolbar=1&navpanes=1&scrollbar=1&zoom=${zoomLevel}`}
-                      className="w-full h-full"
-                      title={selectedDocument.name}
-                      style={{ transform: `scale(${zoomLevel / 100})`, transformOrigin: 'top left' }}
-                      onError={() => {
-                        console.error("Eroare la încărcarea PDF-ului în iframe")
-                      }}
-                    />
-                  )}
+              <iframe
+                src={`${selectedDocument.url}#toolbar=1&navpanes=1&scrollbar=1&zoom=${zoomLevel}`}
+                className="w-full h-full"
+                title={selectedDocument.name}
+                style={{ transform: `scale(${zoomLevel / 100})`, transformOrigin: 'top left' }}
+                onError={() => {
+                  console.error("Eroare la încărcarea PDF-ului în iframe")
+                }}
+              />
+              
+              {/* Loading overlay */}
+              <div className="absolute inset-0 bg-gray-100 flex items-center justify-center opacity-0 transition-opacity duration-300 pointer-events-none">
+                <div className="text-center">
+                  <div className="animate-spin rounded-full h-8 w-8 border-b-2 border-blue-600 mx-auto mb-2"></div>
+                  <p className="text-gray-600 text-sm">Se încarcă documentul...</p>
                 </div>
-              )}
+              </div>
             </div>
             
             {!isFullscreen && (

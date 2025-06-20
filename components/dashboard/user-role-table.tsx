@@ -177,13 +177,13 @@ export function UserRoleTable({ initialUsers }: UserRoleTableProps) {
       {user?.email === "radu.p1995@yahoo.com" && (
         <form onSubmit={handleAddUser} className="flex flex-col md:flex-row items-start gap-4 p-4 border rounded-lg bg-gray-50">
           <div className="flex-1">
-            <Input
-              type="email"
-              placeholder="Adaugă email utilizator"
-              value={newUserEmail}
-              onChange={(e) => setNewUserEmail(e.target.value)}
-              disabled={isLoading}
-            />
+        <Input
+          type="email"
+          placeholder="Adaugă email utilizator"
+          value={newUserEmail}
+          onChange={(e) => setNewUserEmail(e.target.value)}
+          disabled={isLoading}
+        />
           </div>
           
           <div className="flex-2">
@@ -211,9 +211,9 @@ export function UserRoleTable({ initialUsers }: UserRoleTableProps) {
           </div>
           
           <Button type="submit" disabled={isLoading || newUserTabs.length === 0}>
-            <MdAdd className="mr-2" /> Adaugă
-          </Button>
-        </form>
+          <MdAdd className="mr-2" /> Adaugă
+        </Button>
+      </form>
       )}
 
       <div className="border rounded-md overflow-x-auto">
@@ -291,9 +291,9 @@ export function UserRoleTable({ initialUsers }: UserRoleTableProps) {
                         onClick={() => handleRemoveUser(u.uid)} 
                         disabled={isLoading || updatingUser === u.uid}
                       >
-                        <MdDelete className="text-red-500" />
-                      </Button>
-                    </TableCell>
+                      <MdDelete className="text-red-500" />
+                    </Button>
+                  </TableCell>
                   )}
                 </TableRow>
               ))
