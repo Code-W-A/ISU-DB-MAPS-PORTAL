@@ -9,8 +9,15 @@ import { Document, Page, pdfjs } from 'react-pdf'
 import 'react-pdf/dist/Page/AnnotationLayer.css'
 import 'react-pdf/dist/Page/TextLayer.css'
 
-// Configurare PDF.js worker
-pdfjs.GlobalWorkerOptions.workerSrc = `//unpkg.com/pdfjs-dist@${pdfjs.version}/build/pdf.worker.min.js`
+// Configurare PDF.js worker pentru PWA compatibility
+if (typeof window !== 'undefined') {
+  // Încercăm să folosim worker-ul standard, dar cu fallback pentru PWA
+  try {
+    pdfjs.GlobalWorkerOptions.workerSrc = `//unpkg.com/pdfjs-dist@${pdfjs.version}/build/pdf.worker.min.js`
+  } catch (error) {
+    console.warn('Failed to set PDF.js worker, falling back to no worker')
+  }
+}
 
 // Structură de foldere și documente legislative
 const legislatieData = [
@@ -216,8 +223,13 @@ export function LegislatieTab() {
     setZoomLevel(100)
     resetMobileViewer()
     
+    addDebugLog(`Document selectat: ${doc.name}`)
+    
     // Pentru mobile, fetch PDF data pentru compatibilitate PWA
     if (isMobile) {
+      const isPWA = typeof window !== 'undefined' && ((window.navigator as any).standalone || window.matchMedia('(display-mode: standalone)').matches)
+      addDebugLog(`PWA detectat: ${isPWA}`)
+      
       const pdfArrayBuffer = await fetchPdfData(doc.url)
       setPdfData(pdfArrayBuffer)
     } else {
@@ -283,11 +295,24 @@ export function LegislatieTab() {
   }
 
   const onDocumentLoadError = (error: Error) => {
-    const errorMsg = 'Nu s-a putut încărca PDF-ul. Încercați să-l deschideți în browser.'
-    addDebugLog(`EROARE react-pdf: ${error.message}`)
+    const errorMsg = error.message || 'Eroare necunoscută la încărcarea PDF-ului'
+    addDebugLog(`EROARE react-pdf: ${errorMsg}`)
+    
+    // Dacă eroarea este legată de worker, încearcă fără worker
+    if (errorMsg.includes('worker') || errorMsg.includes('Worker')) {
+      addDebugLog('Încercare fără worker PDF.js...')
+      // Resetăm worker-ul
+      try {
+        pdfjs.GlobalWorkerOptions.workerSrc = ''
+        addDebugLog('Worker dezactivat, se reîncearcă...')
+      } catch (e) {
+        addDebugLog('Nu s-a putut dezactiva worker-ul')
+      }
+    }
+    
     console.error('Error loading PDF:', error)
     setIsLoading(false)
-    setPdfError(errorMsg)
+    setPdfError(`${errorMsg}. Încercați să deschideți PDF-ul în browser.`)
   }
 
   const goToPrevPage = () => {
@@ -436,9 +461,11 @@ export function LegislatieTab() {
                       </div>
                     }
                     options={{
-                      cMapUrl: `https://unpkg.com/pdfjs-dist@${pdfjs.version}/cmaps/`,
-                      cMapPacked: true,
-                      standardFontDataUrl: `https://unpkg.com/pdfjs-dist@${pdfjs.version}/standard_fonts/`,
+                      // Opțiuni minime pentru PWA compatibility
+                      ...(typeof window !== 'undefined' && {
+                        cMapUrl: `https://unpkg.com/pdfjs-dist@${pdfjs.version}/cmaps/`,
+                        cMapPacked: true,
+                      }),
                     }}
                     className="w-full"
                   >
