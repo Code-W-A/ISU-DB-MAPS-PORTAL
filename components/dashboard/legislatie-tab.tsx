@@ -27,13 +27,13 @@ const legislatieData = [
         size: "5.6 MB",
         description: "Documentul principal pentru organizarea răspunsului național la cutremure"
       },
-      { 
-        id: "doc2", 
-        name: "Conceptia Nationala de Raspuns Post Seism (Original)", 
-        url: "/legislatie/ConceptiaNationalaDeRaspunsPostSeism.pdf", 
-        size: "4.2 MB",
-        description: "Versiunea originală a conceptului național"
-      },
+      // { 
+      //   id: "doc2", 
+      //   name: "Conceptia Nationala de Raspuns Post Seism (Original)", 
+      //   url: "/legislatie/ConceptiaNationalaDeRaspunsPostSeism.pdf", 
+      //   size: "4.2 MB",
+      //   description: "Versiunea originală a conceptului național"
+      // },
       { 
         id: "doc3", 
         name: "Strategia Națională de Reducere a Riscului Seismic", 
@@ -75,6 +75,20 @@ const legislatieData = [
         url: "/legislatie/HG 557 din 2016_Mg tipurilor de risc.pdf", 
         size: "456 KB",
         description: "Hotărârea de Guvern privind managementul tipurilor de risc"
+      },
+      { 
+        id: "doc9", 
+        name: "PS - MAI - DGMO - 115 - SEISM MAJOR", 
+        url: "/legislatie/PS - MAI - DGMO - 115 - SEISM MAJOR.pdf", 
+        size: "1.3 MB",
+        description: "Procedură specifică pentru gestionarea situațiilor de urgență generate de cutremur, aprobată de MAI - DGMO."
+      },
+      { 
+        id: "doc10", 
+        name: "Regulamentul privind gestionarea situațiilor de urgență generate de cutremur (2023)", 
+        url: "/legislatie/regulamentul-privind-gestionarea-situatiilor-de-urgenta-generate-de-cutremur-din-20092023.pdf", 
+        size: "881 KB",
+        description: "Regulament actualizat pentru gestionarea situațiilor de urgență generate de cutremur, septembrie 2023."
       },
     ],
   },
