@@ -100,17 +100,36 @@ export function LegislatieTab() {
 
   const folder = legislatieData.find((f) => f.id === selectedFolder)
 
+  // Function to get PDF URL (use API proxy for PWA compatibility)
+  const getPdfUrl = (originalUrl: string) => {
+    if (typeof window !== 'undefined') {
+      // Pentru PWA și mobile, folosim API proxy
+      const isStandalone = (window.navigator as any).standalone || window.matchMedia('(display-mode: standalone)').matches
+      if (isMobile || isStandalone) {
+        const fileName = originalUrl.split('/').pop()
+        return `/api/pdf-proxy/${fileName}`
+      }
+    }
+    // Pentru desktop, folosim URL-ul original
+    return originalUrl
+  }
+
   // Function to fetch PDF as ArrayBuffer for PWA compatibility
   const fetchPdfData = async (url: string): Promise<ArrayBuffer | null> => {
     try {
       setIsLoading(true)
       setPdfError(null)
       
-      const response = await fetch(url, {
+      // Folosim URL-ul proxy pentru PWA
+      const pdfUrl = getPdfUrl(url)
+      
+      const response = await fetch(pdfUrl, {
         method: 'GET',
         headers: {
           'Accept': 'application/pdf',
         },
+        // Pentru PWA
+        cache: 'force-cache',
       })
       
       if (!response.ok) {
@@ -121,7 +140,7 @@ export function LegislatieTab() {
       return arrayBuffer
     } catch (error) {
       console.error('Error fetching PDF:', error)
-      setPdfError(error instanceof Error ? error.message : 'Eroare necunoscută')
+      setPdfError(error instanceof Error ? error.message : 'Eroare la încărcarea PDF-ului')
       return null
     } finally {
       setIsLoading(false)
@@ -362,7 +381,7 @@ export function LegislatieTab() {
                 
                 {(!isLoading && (pdfData || !isMobile)) && (
                   <Document
-                    file={pdfData || selectedDocument.url}
+                    file={pdfData || getPdfUrl(selectedDocument.url)}
                     onLoadSuccess={onDocumentLoadSuccess}
                     onLoadError={onDocumentLoadError}
                     loading={
@@ -374,8 +393,12 @@ export function LegislatieTab() {
                     error={
                       <div className="flex flex-col items-center justify-center h-64 p-4">
                         <MdPictureAsPdf className="h-12 w-12 text-red-400 mb-4" />
-                        <p className="text-gray-600 text-sm text-center mb-4">
+                        <p className="text-gray-600 text-sm text-center mb-2">
                           {pdfError || "Nu s-a putut încărca PDF-ul în viewer-ul intern."}
+                        </p>
+                        <p className="text-gray-500 text-xs text-center mb-4">
+                          PWA Mode: {isMobile ? 'Da' : 'Nu'} | 
+                          URL: {getPdfUrl(selectedDocument.url)}
                         </p>
                         <div className="flex gap-2">
                           <Button variant="outline" size="sm" asChild>
@@ -415,7 +438,11 @@ export function LegislatieTab() {
           {/* Footer cu opțiuni suplimentare pentru mobile */}
           <div className="bg-gray-50 p-3 rounded-lg text-center">
             <div className="text-xs text-gray-600 space-y-2">
-              <p>Viewer PDF optimizat pentru mobile</p>
+              <p>Viewer PDF optimizat pentru mobile/PWA</p>
+              <p className="text-gray-500">
+                Mode: {isMobile ? 'Mobile' : 'Desktop'} | 
+                PWA: {typeof window !== 'undefined' && ((window.navigator as any).standalone || window.matchMedia('(display-mode: standalone)').matches) ? 'Da' : 'Nu'}
+              </p>
               <div className="flex justify-center gap-4">
                 <a 
                   href={selectedDocument.url} 
@@ -431,6 +458,14 @@ export function LegislatieTab() {
                   className="text-blue-600 underline hover:text-blue-800"
                 >
                   Descarcă PDF
+                </a>
+                <a 
+                  href={getPdfUrl(selectedDocument.url)} 
+                  target="_blank" 
+                  rel="noopener noreferrer"
+                  className="text-green-600 underline hover:text-green-800"
+                >
+                  API Proxy
                 </a>
               </div>
             </div>
