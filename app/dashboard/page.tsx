@@ -124,57 +124,67 @@ export default function DashboardPage() {
   const gridCols = Math.min(tabsCount, 8)
 
   return (
-    <div className="container mx-auto py-8">
-      <div className="flex justify-between items-center mb-6">
-        <h1 className="text-3xl font-bold">Dashboard Administrator</h1>
-        <Button variant="outline" onClick={() => router.push("/")}>
+    <div className="container mx-auto py-4 px-4 md:py-8">
+      <div className="flex flex-col sm:flex-row justify-between items-start sm:items-center gap-4 mb-6">
+        <h1 className="text-2xl md:text-3xl font-bold">Dashboard Administrator</h1>
+        <Button variant="outline" onClick={() => router.push("/")} className="w-full sm:w-auto">
           <MdArrowBack className="mr-2" /> Înapoi la hartă
         </Button>
       </div>
 
-      <Tabs defaultValue={allowedTabs[0]} className="space-y-6">
-        <TabsList className={`grid w-full max-w-6xl mx-auto`} style={{ gridTemplateColumns: `repeat(${gridCols}, 1fr)` }}>
-          {allowedTabs.includes("users") && (
-            <TabsTrigger value="users" className="flex items-center gap-2">
-              <MdPeople className="h-4 w-4" /> Utilizatori
-            </TabsTrigger>
-          )}
-          {allowedTabs.includes("hydrants") && (
-            <TabsTrigger value="hydrants" className="flex items-center gap-2">
-              <MdFireHydrantAlt className="h-4 w-4" /> Hidranți
-            </TabsTrigger>
-          )}
-          {allowedTabs.includes("reports") && (
-            <TabsTrigger value="reports" className="flex items-center gap-2">
-              <MdReportProblem className="h-4 w-4" /> Semnalări
-            </TabsTrigger>
-          )}
-          {allowedTabs.includes("primarii") && (
-            <TabsTrigger value="primarii" className="flex items-center gap-2">
-              <MdAccountBalance className="h-4 w-4" /> Primării
-            </TabsTrigger>
-          )}
-          {allowedTabs.includes("seveso") && (
-            <TabsTrigger value="seveso" className="flex items-center gap-2">
-              <MdWarning className="h-4 w-4" /> SEVESO
-            </TabsTrigger>
-          )}
-          {allowedTabs.includes("data") && (
-            <TabsTrigger value="data" className="flex items-center gap-2">
-              <MdStorage className="h-4 w-4" /> Import Date
-            </TabsTrigger>
-          )}
-          {allowedTabs.includes("settings") && (
-            <TabsTrigger value="settings" className="flex items-center gap-2">
-              <MdSettings className="h-4 w-4" /> Setări
-            </TabsTrigger>
-          )}
-          {allowedTabs.includes("legislatie") && (
-            <TabsTrigger value="legislatie" className="flex items-center gap-2">
-              <MdAccountBalance className="h-4 w-4" /> Legislație
-            </TabsTrigger>
-          )}
-        </TabsList>
+      <Tabs defaultValue={allowedTabs[0]} className="space-y-4 md:space-y-6">
+        <div className="w-full">
+          <TabsList className="flex flex-col md:grid w-full gap-1 md:gap-0 h-auto md:h-10 p-1 bg-muted rounded-md" style={{ gridTemplateColumns: `repeat(${gridCols}, minmax(120px, 1fr))` }}>
+            {allowedTabs.includes("users") && (
+              <TabsTrigger value="users" className="flex items-center justify-start md:justify-center gap-2 text-sm px-3 py-2 w-full md:w-auto">
+                <MdPeople className="h-4 w-4" /> 
+                <span>Utilizatori</span>
+              </TabsTrigger>
+            )}
+            {allowedTabs.includes("hydrants") && (
+              <TabsTrigger value="hydrants" className="flex items-center justify-start md:justify-center gap-2 text-sm px-3 py-2 w-full md:w-auto">
+                <MdFireHydrantAlt className="h-4 w-4" /> 
+                <span>Hidranți</span>
+              </TabsTrigger>
+            )}
+            {allowedTabs.includes("reports") && (
+              <TabsTrigger value="reports" className="flex items-center justify-start md:justify-center gap-2 text-sm px-3 py-2 w-full md:w-auto">
+                <MdReportProblem className="h-4 w-4" /> 
+                <span>Semnalări</span>
+              </TabsTrigger>
+            )}
+            {allowedTabs.includes("primarii") && (
+              <TabsTrigger value="primarii" className="flex items-center justify-start md:justify-center gap-2 text-sm px-3 py-2 w-full md:w-auto">
+                <MdAccountBalance className="h-4 w-4" /> 
+                <span>Primării</span>
+              </TabsTrigger>
+            )}
+            {allowedTabs.includes("seveso") && (
+              <TabsTrigger value="seveso" className="flex items-center justify-start md:justify-center gap-2 text-sm px-3 py-2 w-full md:w-auto">
+                <MdWarning className="h-4 w-4" /> 
+                <span>SEVESO</span>
+              </TabsTrigger>
+            )}
+            {allowedTabs.includes("data") && (
+              <TabsTrigger value="data" className="flex items-center justify-start md:justify-center gap-2 text-sm px-3 py-2 w-full md:w-auto">
+                <MdStorage className="h-4 w-4" /> 
+                <span>Import Date</span>
+              </TabsTrigger>
+            )}
+            {allowedTabs.includes("settings") && (
+              <TabsTrigger value="settings" className="flex items-center justify-start md:justify-center gap-2 text-sm px-3 py-2 w-full md:w-auto">
+                <MdSettings className="h-4 w-4" /> 
+                <span>Setări</span>
+              </TabsTrigger>
+            )}
+            {allowedTabs.includes("legislatie") && (
+              <TabsTrigger value="legislatie" className="flex items-center justify-start md:justify-center gap-2 text-sm px-3 py-2 w-full md:w-auto">
+                <MdAccountBalance className="h-4 w-4" /> 
+                <span>Legislație</span>
+              </TabsTrigger>
+            )}
+          </TabsList>
+        </div>
 
         {allowedTabs.includes("users") && (
           <TabsContent value="users" className="space-y-6">
