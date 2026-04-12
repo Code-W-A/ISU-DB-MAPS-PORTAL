@@ -2,19 +2,19 @@
 
 import { useState, useEffect } from "react"
 import { useAuth } from "@/components/auth-provider"
-import { signOut } from "firebase/auth"
-import { auth } from "@/lib/firebase"
 import { hasFullAccess, getAllUsers } from "@/lib/role-service"
 import { Map } from "@/components/map"
 import { GoogleMapsLoader } from "@/components/google-maps-loader"
+import { MapLocationSearchProvider } from "@/components/map-location-search-bridge"
+import { LogoutConfirmDialog } from "@/components/logout-confirm-dialog"
 import { useRouter } from "next/navigation"
-import type { UserRole } from "@/types/user-role"
 
 export function MapContainer() {
   const { user } = useAuth()
   const [hasAccess, setHasAccess] = useState(false)
   const [isAdmin, setIsAdmin] = useState(false)
   const [hasDashboardAccess, setHasDashboardAccess] = useState(false)
+  const [logoutDialogOpen, setLogoutDialogOpen] = useState(false)
   const router = useRouter()
 
   // Verificăm dacă utilizatorul are acces complet și dacă este admin
@@ -53,21 +53,18 @@ export function MapContainer() {
     checkAccess()
   }, [user])
 
-  const handleSignOut = async () => {
-    try {
-      await signOut(auth)
-    } catch (error) {
-      console.error("Error signing out:", error)
-    }
-  }
+  const handleSignOutRequest = () => setLogoutDialogOpen(true)
 
   const handleNavigateToDashboard = () => {
     router.push("/dashboard")
   }
 
   return (
-    <GoogleMapsLoader onSignOut={handleSignOut} userEmail={user?.email || ""} isAdmin={hasDashboardAccess}>
-      <Map hasAccess={hasAccess} isAdmin={isAdmin} />
-    </GoogleMapsLoader>
+    <MapLocationSearchProvider>
+      <GoogleMapsLoader onSignOut={handleSignOutRequest} userEmail={user?.email || ""} isAdmin={hasDashboardAccess}>
+        <Map hasAccess={hasAccess} isAdmin={isAdmin} />
+      </GoogleMapsLoader>
+      <LogoutConfirmDialog open={logoutDialogOpen} onOpenChange={setLogoutDialogOpen} />
+    </MapLocationSearchProvider>
   )
 }

@@ -3,6 +3,11 @@
 import React from "react"
 import { render, screen, waitFor } from "@testing-library/react"
 import { Map } from "@/components/map"
+import { MapLocationSearchProvider } from "@/components/map-location-search-bridge"
+
+function renderWithSearchBridge(ui: React.ReactElement) {
+  return render(<MapLocationSearchProvider>{ui}</MapLocationSearchProvider>)
+}
 
 // Mock the Google Maps API
 jest.mock("@react-google-maps/api", () => ({
@@ -105,12 +110,12 @@ describe("Map Component", () => {
       useJsApiLoader: () => mockUseJsApiLoader,
     }))
 
-    render(<Map />)
+    renderWithSearchBridge(<Map />)
     expect(screen.getByRole("status")).toBeInTheDocument()
   })
 
   test("renders Google Map when loaded", async () => {
-    render(<Map />)
+    renderWithSearchBridge(<Map />)
 
     await waitFor(() => {
       expect(screen.getByTestId("google-map")).toBeInTheDocument()
@@ -118,7 +123,7 @@ describe("Map Component", () => {
   })
 
   test("fetches hydrants data on mount", async () => {
-    render(<Map />)
+    renderWithSearchBridge(<Map />)
 
     await waitFor(() => {
       expect(global.fetch).toHaveBeenCalledWith(
@@ -139,7 +144,7 @@ describe("Map Component", () => {
       return null
     })
 
-    render(<Map />)
+    renderWithSearchBridge(<Map />)
 
     await waitFor(() => {
       expect(global.fetch).not.toHaveBeenCalled()
@@ -147,7 +152,7 @@ describe("Map Component", () => {
   })
 
   test("renders map controls", async () => {
-    render(<Map />)
+    renderWithSearchBridge(<Map />)
 
     await waitFor(() => {
       // Check for map controls

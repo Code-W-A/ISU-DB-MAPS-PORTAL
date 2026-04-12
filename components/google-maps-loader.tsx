@@ -7,6 +7,7 @@ import Image from "next/image"
 import { MdLogout, MdDashboard } from "react-icons/md"
 import { useMobile } from "@/hooks/use-mobile"
 import { MobileHeader } from "@/components/mobile-header"
+import { MapLocationSearchBar } from "@/components/map-location-search-bridge"
 import { useRouter } from "next/navigation"
 
 interface GoogleMapsLoaderProps {
@@ -20,14 +21,33 @@ export function GoogleMapsLoader({ children, onSignOut, userEmail, isAdmin = fal
   const [apiKey, setApiKey] = useState<string | null>(null)
   const [isLoading, setIsLoading] = useState(true)
   const [error, setError] = useState<string | null>(null)
+  const [isOnline, setIsOnline] = useState(true)
   const { isMobile, isLowEndDevice, connectionType } = useMobile()
   const apiKeyRequestRef = useRef<AbortController | null>(null)
   const router = useRouter()
 
   useEffect(() => {
+    if (typeof window === "undefined") return
+
+    setIsOnline(navigator.onLine)
+
+    const handleOnline = () => setIsOnline(true)
+    const handleOffline = () => setIsOnline(false)
+
+    window.addEventListener("online", handleOnline)
+    window.addEventListener("offline", handleOffline)
+
+    return () => {
+      window.removeEventListener("online", handleOnline)
+      window.removeEventListener("offline", handleOffline)
+    }
+  }, [])
+
+  useEffect(() => {
     // Create a new AbortController for this request
     apiKeyRequestRef.current = new AbortController()
     const signal = apiKeyRequestRef.current.signal
+    let timeoutId: number | NodeJS.Timeout | null = null
 
     async function fetchApiKey() {
       try {
@@ -36,15 +56,22 @@ export function GoogleMapsLoader({ children, onSignOut, userEmail, isAdmin = fal
         const cachedTimestamp = localStorage.getItem("mapsApiKeyTimestamp")
         const now = Date.now()
 
-        // Use cached key if it's less than 1 hour old
-        if (cachedKey && cachedTimestamp && now - Number.parseInt(cachedTimestamp) < 60 * 60 * 1000) {
+        // Use cached key immediately for fast startup and offline resilience
+        if (cachedKey) {
           setApiKey(cachedKey)
           setIsLoading(false)
-          return
         }
 
-        // Add a cache-busting parameter to avoid browser caching
-        const res = await fetch(`/api/maps-key?v=${Date.now()}`, { signal })
+        const shouldRefresh = !cachedTimestamp || now - Number.parseInt(cachedTimestamp) >= 60 * 60 * 1000
+        if (!shouldRefresh && cachedKey) return
+
+        timeoutId = window.setTimeout(() => {
+          if (apiKeyRequestRef.current) {
+            apiKeyRequestRef.current.abort()
+          }
+        }, 8000)
+
+        const res = await fetch("/api/maps-key", { signal, cache: "no-store" })
 
         if (!res.ok) {
           throw new Error(`Failed to fetch API key: ${res.status} ${res.statusText}`)
@@ -62,6 +89,7 @@ export function GoogleMapsLoader({ children, onSignOut, userEmail, isAdmin = fal
           localStorage.setItem("mapsApiKeyTimestamp", now.toString())
 
           setApiKey(data.apiKey)
+          setError(null)
           setIsLoading(false)
         } else {
           throw new Error("No API key returned from server")
@@ -70,8 +98,20 @@ export function GoogleMapsLoader({ children, onSignOut, userEmail, isAdmin = fal
         // Only set error if this wasn't an abort
         if (!signal.aborted) {
           console.error("Error fetching Maps API key:", error)
-          setError(error.message)
+          const cachedKey = localStorage.getItem("mapsApiKey")
+          if (cachedKey) {
+            setApiKey(cachedKey)
+            setError(null)
+          } else {
+            const errorMessage = error instanceof Error ? error.message : "Failed to fetch Maps API key"
+            setError(errorMessage)
+          }
           setIsLoading(false)
+        }
+      } finally {
+        if (timeoutId) {
+          window.clearTimeout(timeoutId)
+          timeoutId = null
         }
       }
     }
@@ -98,6 +138,14 @@ export function GoogleMapsLoader({ children, onSignOut, userEmail, isAdmin = fal
 
   const handleNavigateToDashboard = () => {
     router.push("/dashboard")
+  }
+
+  const renderChildren = () => {
+    if (!React.isValidElement(children)) {
+      return children
+    }
+
+    return React.cloneElement(children as React.ReactElement<any>, { apiKey })
   }
 
   if (isLoading) {
@@ -162,6 +210,11 @@ export function GoogleMapsLoader({ children, onSignOut, userEmail, isAdmin = fal
   // Only render children (which will include the map) when we have the API key
   return (
     <div className="flex flex-col h-screen">
+      {!isOnline && (
+        <div className="bg-amber-100 text-amber-900 text-center text-sm py-2 px-3 border-b border-amber-300">
+          Mod offline activ. Se folosesc datele disponibile din cache.
+        </div>
+      )}
       {isMobile ? (
         <>
           <MobileHeader
@@ -170,21 +223,22 @@ export function GoogleMapsLoader({ children, onSignOut, userEmail, isAdmin = fal
             isAdmin={isAdmin}
             onNavigateToDashboard={handleNavigateToDashboard}
           />
-          <div className="flex-1 relative h-screen">
-            {React.cloneElement(children as React.ReactElement, { apiKey })}
-          </div>
+          <div className="flex-1 relative min-h-0">{renderChildren()}</div>
         </>
       ) : (
         <>
-          <div className="flex justify-between items-center p-4 border-b">
-            <div className="flex items-center gap-3">
+          <div className="grid grid-cols-[auto_minmax(0,1fr)_auto] gap-3 items-center p-4 border-b relative z-30">
+            <div className="flex items-center gap-3 shrink-0">
               <div className="relative w-10 h-10">
                 <Image src="/images/isu-logo.png" alt="ISU DB MAPS Logo" fill className="object-contain" />
               </div>
-              <h1 className="text-2xl font-bold">ISU DB MAPS</h1>
+              <h1 className="text-2xl font-bold whitespace-nowrap">ISU DB MAPS</h1>
             </div>
-            <div className="flex items-center gap-4">
-              <span className="hidden sm:inline">Conectat ca {userEmail}</span>
+            <div className="flex justify-center min-w-0 px-2">
+              <MapLocationSearchBar className="max-w-xl" />
+            </div>
+            <div className="flex items-center justify-end gap-2 sm:gap-4 shrink-0">
+              <span className="hidden lg:inline text-sm text-muted-foreground truncate max-w-[12rem]">Conectat ca {userEmail}</span>
               {isAdmin && (
                 <Button variant="outline" size="sm" onClick={handleNavigateToDashboard} type="button">
                   <MdDashboard size={16} className="mr-2" />
@@ -197,7 +251,7 @@ export function GoogleMapsLoader({ children, onSignOut, userEmail, isAdmin = fal
               </Button>
             </div>
           </div>
-          <div className="flex-1 relative">{React.cloneElement(children as React.ReactElement, { apiKey })}</div>
+          <div className="flex-1 relative min-h-0">{renderChildren()}</div>
         </>
       )}
     </div>

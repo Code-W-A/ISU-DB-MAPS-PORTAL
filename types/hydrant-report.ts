@@ -2,6 +2,8 @@ import type { Hydrant } from "@/types/hydrant"
 
 export type HydrantReportStatus = "în așteptare" | "aprobat" | "respins"
 export type HydrantReportType = "nou" | "modificare"
+export type HydrantQuickReason = "nefunctional" | "acces_blocat" | "lipseste_capac" | "nu_se_gaseste"
+export type HydrantReportSourceMode = "rapid" | "avansat"
 
 export interface HydrantReport {
   id: string
@@ -12,6 +14,9 @@ export interface HydrantReport {
   userId: string // ID-ul utilizatorului care a făcut semnalarea
   userEmail: string // Email-ul utilizatorului
   createdAt: number // Timestamp
+  updatedAt?: number
+  quickReason?: HydrantQuickReason
+  sourceMode?: HydrantReportSourceMode
   coordonate: {
     latitude: number
     longitude: number

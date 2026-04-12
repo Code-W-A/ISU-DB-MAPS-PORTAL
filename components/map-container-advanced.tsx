@@ -17,8 +17,7 @@ import {
 import type { Hydrant } from "@/types/hydrant"
 import { Skeleton } from "@/components/ui/skeleton"
 import { useAuth } from "@/components/auth-provider"
-import { signOut } from "firebase/auth"
-import { auth } from "@/lib/firebase"
+import { LogoutConfirmDialog } from "@/components/logout-confirm-dialog"
 import Image from "next/image"
 
 const mapContainerStyle = {
@@ -152,6 +151,7 @@ export function MapContainer() {
   const [zoom, setZoom] = useState(14)
   const [apiKey, setApiKey] = useState<string>("")
   const [apiKeyLoaded, setApiKeyLoaded] = useState<boolean>(false)
+  const [logoutDialogOpen, setLogoutDialogOpen] = useState(false)
 
   // Load Google Maps API key from server
   useEffect(() => {
@@ -255,13 +255,7 @@ export function MapContainer() {
     setVisibleHydrants(limitedHydrants)
   }, [hydrants, mapBounds, zoom])
 
-  const handleSignOut = async () => {
-    try {
-      await signOut(auth)
-    } catch (error) {
-      console.error("Error signing out:", error)
-    }
-  }
+  const handleSignOutRequest = () => setLogoutDialogOpen(true)
 
   const getDirections = (hydrant: Hydrant) => {
     const lat = hydrant.Localizare.Latitudine
@@ -286,25 +280,29 @@ export function MapContainer() {
 
   if (!apiKeyLoaded || !isLoaded || isLoading) {
     return (
-      <div className="p-4">
-        <div className="flex justify-between items-center mb-4">
-          <div className="flex items-center gap-3">
-            <div className="relative w-10 h-10">
-              <Image src="/images/isu-logo.png" alt="ISU DB MAPS Logo" fill className="object-contain" />
+      <>
+        <div className="p-4">
+          <div className="mb-4 flex justify-between items-center">
+            <div className="flex items-center gap-3">
+              <div className="relative h-10 w-10">
+                <Image src="/images/isu-logo.png" alt="ISU DB MAPS Logo" fill className="object-contain" />
+              </div>
+              <h1 className="text-2xl font-bold">ISU DB MAPS</h1>
             </div>
-            <h1 className="text-2xl font-bold">ISU DB MAPS</h1>
+            <Button type="button" onClick={handleSignOutRequest}>
+              <MdLogout size={16} className="mr-2" />
+              Deconectare
+            </Button>
           </div>
-          <Button onClick={handleSignOut}>
-            <MdLogout size={16} className="mr-2" />
-            Deconectare
-          </Button>
+          <Skeleton className="h-[calc(100vh-120px)] w-full" />
         </div>
-        <Skeleton className="w-full h-[calc(100vh-120px)]" />
-      </div>
+        <LogoutConfirmDialog open={logoutDialogOpen} onOpenChange={setLogoutDialogOpen} />
+      </>
     )
   }
 
   return (
+    <>
     <div className="flex flex-col h-screen">
       <div className="flex justify-between items-center p-4 border-b">
         <div className="flex items-center gap-3">
@@ -315,7 +313,7 @@ export function MapContainer() {
         </div>
         <div className="flex items-center gap-4">
           <span>Conectat ca {user?.email}</span>
-          <Button variant="outline" size="sm" onClick={handleSignOut}>
+          <Button variant="outline" size="sm" type="button" onClick={handleSignOutRequest}>
             <MdLogout size={16} className="mr-2" />
             Deconectare
           </Button>
@@ -417,5 +415,7 @@ export function MapContainer() {
         </GoogleMap>
       </div>
     </div>
+    <LogoutConfirmDialog open={logoutDialogOpen} onOpenChange={setLogoutDialogOpen} />
+    </>
   )
 }

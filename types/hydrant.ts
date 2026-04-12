@@ -1,4 +1,6 @@
 export interface Hydrant {
+  id?: string
+  firestoreId?: string
   Județ: string
   Localitate: string
   Stradă: string

@@ -16,40 +16,49 @@ export function PWARegister() {
       setIsInstalled(true)
     }
 
+    const registerServiceWorker = () => {
+      navigator.serviceWorker
+        .register("/sw.js")
+        .then((registration) => {
+          console.log("Service Worker înregistrat cu succes:", registration.scope)
+        })
+        .catch((error) => {
+          console.error("Eroare la înregistrarea Service Worker:", error)
+        })
+    }
+
     // Înregistrează service worker-ul
     if ("serviceWorker" in navigator) {
-      window.addEventListener("load", () => {
-        navigator.serviceWorker
-          .register("/sw.js")
-          .then((registration) => {
-            console.log("Service Worker înregistrat cu succes:", registration.scope)
-          })
-          .catch((error) => {
-            console.error("Eroare la înregistrarea Service Worker:", error)
-          })
-      })
+      if (document.readyState === "complete") {
+        registerServiceWorker()
+      } else {
+        window.addEventListener("load", registerServiceWorker, { once: true })
+      }
     }
 
     // Captează evenimentul beforeinstallprompt pentru a-l putea folosi mai târziu
-    window.addEventListener("beforeinstallprompt", (e) => {
+    const handleBeforeInstallPrompt = (e: Event) => {
       // Previne afișarea promptului automat
-      e.preventDefault()
+      e.preventDefault?.()
       // Salvează evenimentul pentru a-l putea folosi mai târziu
       setInstallPrompt(e)
-    })
+    }
+    window.addEventListener("beforeinstallprompt", handleBeforeInstallPrompt)
 
     // Detectează când aplicația a fost instalată
-    window.addEventListener("appinstalled", () => {
+    const handleAppInstalled = () => {
       setIsInstalled(true)
       toast({
         title: "Aplicație instalată",
         description: "ISU DB MAPS a fost instalată cu succes pe dispozitivul dvs.",
       })
-    })
+    }
+    window.addEventListener("appinstalled", handleAppInstalled)
 
     return () => {
-      window.removeEventListener("beforeinstallprompt", () => {})
-      window.removeEventListener("appinstalled", () => {})
+      window.removeEventListener("load", registerServiceWorker)
+      window.removeEventListener("beforeinstallprompt", handleBeforeInstallPrompt)
+      window.removeEventListener("appinstalled", handleAppInstalled)
     }
   }, [])
 

@@ -7,9 +7,13 @@ import { Input } from "@/components/ui/input"
 import { Button } from "@/components/ui/button"
 import { Card, CardContent } from "@/components/ui/card"
 import { MdSearch, MdClear, MdLocationOn } from "react-icons/md"
+import { cn } from "@/lib/utils"
 
 interface LocationSearchProps {
   onLocationSelect: (location: google.maps.places.PlaceResult) => void
+  className?: string
+  /** Rând îngust (ex. header mobil) */
+  compact?: boolean
 }
 
 declare global {
@@ -18,7 +22,7 @@ declare global {
   }
 }
 
-export function LocationSearch({ onLocationSelect }: LocationSearchProps) {
+export function LocationSearch({ onLocationSelect, className, compact = false }: LocationSearchProps) {
   const [searchTerm, setSearchTerm] = useState("")
   const [predictions, setPredictions] = useState<google.maps.places.AutocompletePrediction[]>([])
   const [isLoading, setIsLoading] = useState(false)
@@ -121,24 +125,30 @@ export function LocationSearch({ onLocationSelect }: LocationSearchProps) {
   }
 
   return (
-    <div className="relative w-full max-w-md" ref={searchRef}>
+    <div className={cn("relative w-full max-w-md", className)} ref={searchRef}>
       <div className="relative">
         <Input
           type="text"
-          placeholder="Caută o locație..."
+          placeholder={compact ? "Caută locație…" : "Caută o locație..."}
           value={searchTerm}
           onChange={handleSearchChange}
-          className="pr-16 pl-10"
+          className={cn(compact ? "h-9 py-1 pl-9 pr-12 text-sm" : "pl-10 pr-16")}
         />
-        <MdSearch className="absolute left-3 top-1/2 transform -translate-y-1/2 text-gray-400" size={18} />
+        <MdSearch
+          className={cn("absolute top-1/2 -translate-y-1/2 text-muted-foreground", compact ? "left-2" : "left-3")}
+          size={compact ? 16 : 18}
+        />
         {searchTerm && (
           <Button
             variant="ghost"
             size="icon"
-            className="absolute right-1 top-1/2 transform -translate-y-1/2 h-7 w-7"
+            className={cn(
+              "absolute right-0.5 top-1/2 -translate-y-1/2",
+              compact ? "h-7 w-7" : "h-7 w-7",
+            )}
             onClick={handleClearSearch}
           >
-            <MdClear size={16} />
+            <MdClear size={compact ? 14 : 16} />
           </Button>
         )}
       </div>

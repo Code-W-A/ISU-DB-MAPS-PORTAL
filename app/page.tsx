@@ -5,6 +5,7 @@ import { useRouter } from "next/navigation"
 import { useAuth } from "@/components/auth-provider"
 import { MapContainer } from "@/components/map-container"
 import { PWARegister } from "@/components/pwa-register"
+import { HydrantReportOutboxSync } from "@/components/hydrant-report-outbox-sync"
 
 export default function Home() {
   const { user, loading } = useAuth()
@@ -31,6 +32,7 @@ export default function Home() {
   return (
     <main className="flex min-h-screen flex-col">
       <MapContainer />
+      <HydrantReportOutboxSync />
       <PWARegister />
     </main>
   )

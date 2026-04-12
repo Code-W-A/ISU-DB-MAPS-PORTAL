@@ -8,6 +8,7 @@ import { Progress } from "@/components/ui/progress"
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs"
 import { loadHydrantsFromGit } from "@/lib/hydrant-service"
 import { loadPrimariiData } from "@/lib/primarii-service"
+import { useAuth } from "@/components/auth-provider"
 import {
   importHydrantsToFirestore,
   getHydrantsCountFromFirestore,
@@ -21,14 +22,16 @@ import {
 import { AlertCircle, CheckCircle2, Database, GitBranch, Loader2, Trash2 } from "lucide-react"
 
 export function DataImport() {
+  const { user } = useAuth()
   const [isLoadingHydrants, setIsLoadingHydrants] = useState(false)
   const [isLoadingPrimarii, setIsLoadingPrimarii] = useState(false)
   const [isDeletingHydrants, setIsDeletingHydrants] = useState(false)
   const [isDeletingPrimarii, setIsDeletingPrimarii] = useState(false)
+  const [isTriggeringSnapshots, setIsTriggeringSnapshots] = useState(false)
   const [hydrantsCount, setHydrantsCount] = useState<number | null>(null)
   const [primariiCount, setPrimariiCount] = useState<number | null>(null)
   const [importResult, setImportResult] = useState<{
-    type: "hydrants" | "primarii" | "delete-hydrants" | "delete-primarii" | null
+    type: "hydrants" | "primarii" | "delete-hydrants" | "delete-primarii" | "snapshots" | null
     success: boolean
     message: string
   }>({ type: null, success: false, message: "" })
@@ -196,6 +199,62 @@ export function DataImport() {
     }
   }
 
+  const handleGenerateSnapshotsNow = async () => {
+    if (!user) {
+      toast({
+        title: "Eroare",
+        description: "Trebuie să fii autentificat pentru a genera snapshot-uri.",
+        variant: "destructive",
+      })
+      return
+    }
+
+    setIsTriggeringSnapshots(true)
+    setImportResult({ type: null, success: false, message: "" })
+
+    try {
+      const idToken = await user.getIdToken()
+      const response = await fetch("/api/snapshots/trigger", {
+        method: "POST",
+        headers: {
+          Authorization: `Bearer ${idToken}`,
+        },
+      })
+
+      const payload = (await response.json().catch(() => ({}))) as { error?: string; message?: string }
+      if (!response.ok) {
+        throw new Error(payload.error || "Nu s-a putut porni workflow-ul de snapshot.")
+      }
+
+      const successMessage = payload.message || "Workflow-ul de snapshots a fost pornit cu succes."
+      setImportResult({
+        type: "snapshots",
+        success: true,
+        message: successMessage,
+      })
+
+      toast({
+        title: "Workflow pornit",
+        description: successMessage,
+      })
+    } catch (error) {
+      const errorMessage = error instanceof Error ? error.message : "Eroare necunoscută"
+      setImportResult({
+        type: "snapshots",
+        success: false,
+        message: errorMessage,
+      })
+
+      toast({
+        title: "Eroare",
+        description: errorMessage,
+        variant: "destructive",
+      })
+    } finally {
+      setIsTriggeringSnapshots(false)
+    }
+  }
+
   return (
     <Card>
       <CardHeader>
@@ -203,6 +262,33 @@ export function DataImport() {
         <CardDescription>Importă datele despre hidranți și primării din Git în baza de date Firestore</CardDescription>
       </CardHeader>
       <CardContent>
+        <div className="mb-4 flex flex-col gap-3 rounded-md border p-4 md:flex-row md:items-center md:justify-between">
+          <div>
+            <h3 className="text-base font-medium">Map Snapshots</h3>
+            <p className="text-sm text-muted-foreground">
+              Creează imediat un snapshot versionat pentru încărcare rapidă în aplicație.
+            </p>
+          </div>
+          <Button onClick={handleGenerateSnapshotsNow} disabled={isTriggeringSnapshots} className="w-full md:w-auto">
+            {isTriggeringSnapshots ? (
+              <>
+                <Loader2 className="mr-2 h-4 w-4 animate-spin" />
+                Se pornește...
+              </>
+            ) : (
+              "Generate snapshots now"
+            )}
+          </Button>
+        </div>
+
+        {importResult.type === "snapshots" && (
+          <Alert variant={importResult.success ? "default" : "destructive"} className="mb-4">
+            {importResult.success ? <CheckCircle2 className="h-4 w-4" /> : <AlertCircle className="h-4 w-4" />}
+            <AlertTitle>{importResult.success ? "Workflow pornit" : "Eroare la pornire workflow"}</AlertTitle>
+            <AlertDescription>{importResult.message}</AlertDescription>
+          </Alert>
+        )}
+
         <Tabs defaultValue="hydrants" className="space-y-4">
           <TabsList className="grid w-full grid-cols-2">
             <TabsTrigger value="hydrants">Hidranți</TabsTrigger>

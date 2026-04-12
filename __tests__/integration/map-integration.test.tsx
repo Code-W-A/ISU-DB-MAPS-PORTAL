@@ -3,6 +3,11 @@
 import React from "react"
 import { render, screen, fireEvent, waitFor } from "@testing-library/react"
 import { Map } from "@/components/map"
+import { MapLocationSearchProvider } from "@/components/map-location-search-bridge"
+
+function renderMap(ui: React.ReactElement) {
+  return render(<MapLocationSearchProvider>{ui}</MapLocationSearchProvider>)
+}
 
 // Mock the Google Maps API
 jest.mock("@react-google-maps/api", () => {
@@ -109,10 +114,15 @@ global.fetch = jest.fn(() =>
 describe("Map Integration Tests", () => {
   beforeEach(() => {
     jest.clearAllMocks()
+    Object.defineProperty(window, "google", {
+      value: { maps: {} },
+      writable: true,
+      configurable: true,
+    })
   })
 
   test("should load and display hydrants", async () => {
-    render(<Map hasAccess={true} />)
+    renderMap(<Map hasAccess={true} />)
 
     await waitFor(() => {
       const markers = screen.getAllByTestId("marker")
@@ -121,7 +131,7 @@ describe("Map Integration Tests", () => {
   })
 
   test("should show hydrant info when marker is clicked", async () => {
-    render(<Map hasAccess={true} />)
+    renderMap(<Map hasAccess={true} />)
 
     await waitFor(() => {
       const markers = screen.getAllByTestId("marker")
@@ -134,7 +144,7 @@ describe("Map Integration Tests", () => {
   })
 
   test("should close info window when close button is clicked", async () => {
-    render(<Map hasAccess={true} />)
+    renderMap(<Map hasAccess={true} />)
 
     await waitFor(() => {
       const markers = screen.getAllByTestId("marker")
@@ -152,7 +162,7 @@ describe("Map Integration Tests", () => {
   })
 
   test("should get user location when location button is clicked", async () => {
-    render(<Map hasAccess={true} />)
+    renderMap(<Map hasAccess={true} />)
 
     await waitFor(() => {
       const locationButton = screen.getByTitle("Locație")
@@ -163,7 +173,7 @@ describe("Map Integration Tests", () => {
   })
 
   test("should toggle map type when map type button is clicked", async () => {
-    render(<Map hasAccess={true} />)
+    renderMap(<Map hasAccess={true} />)
 
     let mapTypeButton
     await waitFor(() => {
@@ -179,7 +189,7 @@ describe("Map Integration Tests", () => {
   })
 
   test("should toggle filters when filter button is clicked", async () => {
-    render(<Map hasAccess={true} />)
+    renderMap(<Map hasAccess={true} />)
 
     await waitFor(() => {
       const filterButton = screen.getByTitle("Filtrează markeri")

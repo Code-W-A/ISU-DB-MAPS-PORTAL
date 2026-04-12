@@ -31,6 +31,13 @@ export function HydrantReportsTable() {
   const [isProcessing, setIsProcessing] = useState(false)
   const isMobile = useMediaQuery("(max-width: 768px)")
 
+  const quickReasonLabel: Record<string, string> = {
+    nefunctional: "Nefuncțional",
+    acces_blocat: "Acces blocat",
+    lipseste_capac: "Lipsește capac",
+    nu_se_gaseste: "Nu se găsește",
+  }
+
   // Încărcăm semnalările la prima randare și când se schimbă tab-ul activ
   useEffect(() => {
     loadReports()
@@ -107,7 +114,16 @@ export function HydrantReportsTable() {
       if (report.tip === "nou") {
         // Adăugăm hidrantul nou în Firestore
         await addHydrantToFirestore(report.date as Hydrant)
-      } else if (report.tip === "modificare" && report.hidrantId) {
+      } else if (report.tip === "modificare" && (!report.quickReason || report.quickReason === "nefunctional")) {
+        if (!report.hidrantId) {
+          toast({
+            title: "Semnalare invalidă",
+            description: "Lipsește ID-ul hidrantului. Nu se poate aproba această modificare.",
+            variant: "destructive",
+          })
+          return
+        }
+
         // Actualizăm hidrantul existent în Firestore
         await updateHydrantInFirestore(report.hidrantId, report.date as Hydrant)
       }
@@ -290,6 +306,16 @@ export function HydrantReportsTable() {
                     <div>
                       <span className="font-medium">Data:</span> {formatDate(selectedReport.createdAt)}
                     </div>
+                    <div>
+                      <span className="font-medium">Sursă:</span>{" "}
+                      {selectedReport.sourceMode === "rapid" ? "Rapid" : selectedReport.sourceMode === "avansat" ? "Avansat" : "-"}
+                    </div>
+                    {selectedReport.quickReason && (
+                      <div>
+                        <span className="font-medium">Motiv rapid:</span>{" "}
+                        {quickReasonLabel[selectedReport.quickReason] || selectedReport.quickReason}
+                      </div>
+                    )}
                     {selectedReport.comentarii && (
                       <div>
                         <span className="font-medium">Comentarii:</span> {selectedReport.comentarii}

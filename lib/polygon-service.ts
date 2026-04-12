@@ -1,5 +1,46 @@
+import { loadMapLayerSnapshot } from "@/lib/map-snapshot-service"
+
+export type PolygonDataMap = { [key: string]: Array<{ lat: number; lng: number }> }
+
+function sanitizePolygonData(input: unknown): PolygonDataMap {
+  if (!input || typeof input !== "object") return {}
+
+  const safeData: PolygonDataMap = {}
+  for (const [key, value] of Object.entries(input as Record<string, unknown>)) {
+    if (!Array.isArray(value)) continue
+
+    const points = value
+      .filter((point): point is { lat: unknown; lng: unknown } => Boolean(point && typeof point === "object"))
+      .map((point) => ({
+        lat: typeof point.lat === "string" ? Number.parseFloat(point.lat) : Number(point.lat),
+        lng: typeof point.lng === "string" ? Number.parseFloat(point.lng) : Number(point.lng),
+      }))
+      .filter((point) => Number.isFinite(point.lat) && Number.isFinite(point.lng))
+
+    if (points.length > 0) {
+      safeData[key] = points
+    }
+  }
+
+  return safeData
+}
+
+export async function loadPolygonDataFromSnapshot(): Promise<PolygonDataMap> {
+  try {
+    const snapshot = await loadMapLayerSnapshot<unknown>("polygons")
+    if (!snapshot) return {}
+
+    const data = sanitizePolygonData(snapshot.data)
+    console.log(`Loaded polygon snapshot ${snapshot.version} with ${Object.keys(data).length} zones`)
+    return data
+  } catch (error) {
+    console.error("Error loading polygon snapshot:", error)
+    return {}
+  }
+}
+
 // Funcție pentru a încărca și evalua un fișier JavaScript de pe GitHub
-export async function loadPolygonData(raion: string): Promise<{ [key: string]: Array<{ lat: number; lng: number }> }> {
+export async function loadPolygonData(raion: string): Promise<PolygonDataMap> {
   try {
     const response = await fetch(
       `https://raw.githubusercontent.com/RaduPopescu95/isudb_maps_data/refs/heads/main/${raion}.js`,

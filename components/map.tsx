@@ -30,13 +30,15 @@ import {
   MdLocationOn,
   MdTerrain,
   MdReportProblem,
+  MdCall,
 } from "react-icons/md"
 import type { Hydrant } from "@/types/hydrant"
 import type { Primarie } from "@/types/primarie"
 import type { Subunitate } from "@/types/subunitate"
 import type { Seveso, SituatieSeveso } from "@/types/seveso"
 import { Skeleton } from "@/components/ui/skeleton"
-import { loadPolygonData, availableRaions, raionColors } from "@/lib/polygon-service"
+import { loadPolygonData, loadPolygonDataFromSnapshot, availableRaions, raionColors } from "@/lib/polygon-service"
+import { loadHydrantsData, normalizeHydrants } from "@/lib/hydrant-service"
 import { loadPrimariiData } from "@/lib/primarii-service"
 import { loadSubunitatiData } from "@/lib/subunitati-service"
 import { loadSevesoData } from "@/lib/seveso-service"
@@ -44,16 +46,21 @@ import { getSituatiiForSeveso, deleteSituatie } from "@/lib/seveso-situatii-serv
 import { PolygonControls } from "@/components/polygon-controls"
 import { FilterPopup } from "@/components/filter-popup"
 import { MobileBottomNav } from "@/components/mobile-bottom-nav"
-import { LocationSearch } from "@/components/location-search"
+import { useMapLocationSearchBridge } from "@/components/map-location-search-bridge"
 import { findRaionForPoint, raionNameMapping } from "@/lib/geo-utils"
 import { SevesoCoordsEditDialog } from "@/components/seveso-situatie-dialog"
 import { ScrollArea } from "@/components/ui/scroll-area"
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs"
+import { Sheet, SheetContent, SheetHeader, SheetTitle, SheetDescription } from "@/components/ui/sheet"
+import { Checkbox } from "@/components/ui/checkbox"
+import { Label } from "@/components/ui/label"
+import { Switch } from "@/components/ui/switch"
 import { toast } from "@/components/ui/use-toast"
 import { useMobile } from "@/hooks/use-mobile"
 import { renderToStaticMarkup } from "react-dom/server"
 import { HydrantReportDialog } from "@/components/hydrant-report-dialog"
 import { useAuth } from "@/components/auth-provider"
+import { readMapLayerCache, writeMapLayerCache } from "@/lib/offline-db"
 
 // Declare google variable
 declare global {
@@ -62,9 +69,44 @@ declare global {
   }
 }
 
-// URL-ul GitHub pentru datele hidranților
-const HYDRANTS_DATA_URL =
-  "https://raw.githubusercontent.com/RaduPopescu95/isudb_maps_data/refs/heads/main/hidranti.json"
+const MAP_LAYER_CACHE_KEYS = {
+  hydrants: "map-layer-hydrants",
+  primarii: "map-layer-primarii",
+  subunitati: "map-layer-subunitati",
+  polygons: "map-layer-polygons",
+  sevesoSituatii: "map-layer-seveso-situatii",
+} as const
+
+const VISIBLE_RAIONS_STORAGE_KEY = "isu-db-maps-visible-raions-v1"
+
+function readStoredVisibleRaions(): string[] | null {
+  if (typeof window === "undefined") return null
+  try {
+    const raw = window.localStorage.getItem(VISIBLE_RAIONS_STORAGE_KEY)
+    if (!raw) return null
+    const parsed = JSON.parse(raw) as unknown
+    if (!Array.isArray(parsed)) return null
+    const valid = parsed.filter((item): item is string => typeof item === "string" && availableRaions.includes(item))
+    return valid.length > 0 ? valid : null
+  } catch {
+    return null
+  }
+}
+
+function resolveVisibleRaionsForLoad(isMobileDevice: boolean): string[] {
+  const stored = readStoredVisibleRaions()
+  if (stored) return [...stored]
+  return isMobileDevice ? [...availableRaions.slice(0, 3)] : [...availableRaions]
+}
+
+function writeStoredVisibleRaions(raions: string[]) {
+  if (typeof window === "undefined") return
+  try {
+    window.localStorage.setItem(VISIBLE_RAIONS_STORAGE_KEY, JSON.stringify(raions))
+  } catch {
+    // ignore quota / private mode
+  }
+}
 
 // Tipurile de hărți disponibile
 const MAP_TYPES = [
@@ -100,6 +142,150 @@ interface MapProps {
   isAdmin?: boolean
 }
 
+interface HydrantPoint {
+  hydrant: Hydrant
+  lat: number
+  lng: number
+  markerKey: string
+}
+
+type LayerSyncState = {
+  hydrants: number | null
+  primarii: number | null
+  subunitati: number | null
+  polygons: number | null
+  sevesoSituatii: number | null
+}
+
+function haversineDistanceKm(coords1: { lat: number; lng: number }, coords2: { lat: number; lng: number }) {
+  const toRad = (value: number) => (value * Math.PI) / 180
+  const radius = 6371
+  const dLat = toRad(coords2.lat - coords1.lat)
+  const dLon = toRad(coords2.lng - coords1.lng)
+  const lat1 = toRad(coords1.lat)
+  const lat2 = toRad(coords2.lat)
+
+  const a = Math.sin(dLat / 2) ** 2 + Math.sin(dLon / 2) ** 2 * Math.cos(lat1) * Math.cos(lat2)
+  const c = 2 * Math.atan2(Math.sqrt(a), Math.sqrt(1 - a))
+
+  return radius * c
+}
+
+function formatDistance(distanceInKm: number) {
+  if (distanceInKm < 1) {
+    return `${Math.max(1, Math.round(distanceInKm * 1000))} m`
+  }
+
+  return `${distanceInKm.toFixed(2)} km`
+}
+
+function toTelHref(phoneNumber?: string | number | null) {
+  if (phoneNumber === null || phoneNumber === undefined) return null
+  const sanitized = String(phoneNumber)
+    .trim()
+    .replace(/[^\d+]/g, "")
+
+  return sanitized.length > 0 ? `tel:${sanitized}` : null
+}
+
+function getRaionSlugFromPolygonKey(raionName: string) {
+  let raion = raionName.replace(/Coordinates$/, "").toLowerCase()
+
+  if (raionName.startsWith("coordonate")) {
+    raion = raionName.replace(/^coordonate/, "").toLowerCase()
+  }
+
+  return raion
+}
+
+function formatRaionLabel(raion: string) {
+  if (!raion) return "Raion"
+  return `${raion.charAt(0).toUpperCase()}${raion.slice(1)}`
+}
+
+/** Geolocation e blocată explicit doar când browserul raportează context nesecurizat (ex. http://192.168…). */
+function isInsecureGeolocationContext() {
+  return typeof window !== "undefined" && "isSecureContext" in window && window.isSecureContext === false
+}
+
+function canUseBrowserGeolocation() {
+  if (typeof window === "undefined" || typeof navigator === "undefined") return false
+  if (!navigator.geolocation) return false
+  return !isInsecureGeolocationContext()
+}
+
+type GeolocationPermissionStateHint = "granted" | "denied" | "prompt" | "unknown"
+
+async function getGeolocationPermissionState(): Promise<GeolocationPermissionStateHint> {
+  if (typeof navigator === "undefined" || !navigator.permissions?.query) return "unknown"
+  try {
+    const status = await navigator.permissions.query({ name: "geolocation" as PermissionName })
+    if (status.state === "granted" || status.state === "denied" || status.state === "prompt") {
+      return status.state
+    }
+    return "unknown"
+  } catch {
+    return "unknown"
+  }
+}
+
+function toastGeolocationError(permissionState: GeolocationPermissionStateHint, errorCode?: number) {
+  if (errorCode === 2) {
+    toast({
+      title: "Locație indisponibilă",
+      description: "Poziția nu a putut fi determinată (GPS indisponibil sau semnal slab). Încearcă din nou în aer liber.",
+      variant: "destructive",
+    })
+    return
+  }
+  if (errorCode === 3) {
+    toast({
+      title: "Timeout locație",
+      description: "Nu am primit poziția la timp. Verifică că GPS-ul e pornit și încearcă din nou.",
+      variant: "destructive",
+    })
+    return
+  }
+
+  if (errorCode === 1) {
+    const deniedLong =
+      "După un refuz, multe browsere nu mai afișează fereastra de permisiune. Apasă din nou „Locația mea” după ce activezi locația: din meniul site-ului (lângă bara de adresă sau ⋮ → Setări site / Informații → Permisiuni → Locație). Pe iPhone: Setări → Safari → Locații."
+
+    const promptOrUnknown =
+      "Permite accesul la locație dacă apare întrebarea. Dacă ai refuzat înainte, deschide setările site-ului și activează Locația, apoi apasă din nou butonul."
+
+    toast({
+      title: "Acces la locație",
+      description: permissionState === "denied" ? deniedLong : promptOrUnknown,
+      variant: "destructive",
+    })
+    return
+  }
+
+  toast({
+    title: "Locație indisponibilă",
+    description: "Nu am putut obține poziția. Încearcă din nou.",
+    variant: "destructive",
+  })
+}
+
+function calculatePolygonCenter(points: Array<{ lat: number; lng: number }>) {
+  if (!Array.isArray(points) || points.length === 0) return null
+
+  const total = points.reduce(
+    (acc, point) => ({
+      lat: acc.lat + point.lat,
+      lng: acc.lng + point.lng,
+    }),
+    { lat: 0, lng: 0 },
+  )
+
+  return {
+    lat: total.lat / points.length,
+    lng: total.lng / points.length,
+  }
+}
+
 function iconFromReactIcon(
   Icon: FunctionComponent<{ size?: number; color?: string }>,
   size = 26,
@@ -118,7 +304,7 @@ function iconFromReactIcon(
 
 export function Map({ apiKey = "", hasAccess = false, isAdmin = false }: MapProps) {
   const [hydrants, setHydrants] = useState<Hydrant[]>([])
-  const [visibleHydrants, setVisibleHydrants] = useState<Hydrant[]>([])
+  const [visibleHydrantPoints, setVisibleHydrantPoints] = useState<HydrantPoint[]>([])
   const [selectedHydrant, setSelectedHydrant] = useState<Hydrant | null>(null)
   const [isLoading, setIsLoading] = useState(true)
   const [mapRef, setMapRef] = useState<google.maps.Map | null>(null)
@@ -147,7 +333,9 @@ export function Map({ apiKey = "", hasAccess = false, isAdmin = false }: MapProp
   } | null>(null)
   const [userLocation, setUserLocation] = useState<{ lat: number; lng: number } | null>(null)
   const [polygonData, setPolygonData] = useState<{ [key: string]: Array<{ lat: number; lng: number }> }>({})
+  const [selectedRaion, setSelectedRaion] = useState<string | null>(null)
   const [visibleRaions, setVisibleRaions] = useState<string[]>([])
+  const visibleRaionsHydratedRef = useRef(false)
   const [showPolygonControls, setShowPolygonControls] = useState(false)
   const [loadingPolygons, setLoadingPolygons] = useState(true)
   const [showSevesoCircles, setShowSevesoCircles] = useState(true)
@@ -158,7 +346,7 @@ export function Map({ apiKey = "", hasAccess = false, isAdmin = false }: MapProp
   const [loadingSituatii, setLoadingSituatii] = useState(false)
   const { isMobile, orientation, isLowEndDevice } = useMobile()
   const boundsChangeTimeoutRef = useRef<NodeJS.Timeout | null>(null)
-  const zoomChangeTimeoutRef = useRef<NodeJS.Timeout | null>([])
+  const zoomChangeTimeoutRef = useRef<NodeJS.Timeout | null>(null)
   const [searchedLocationMarker, setSearchedLocationMarker] = useState<{
     lat: number
     lng: number
@@ -172,16 +360,73 @@ export function Map({ apiKey = "", hasAccess = false, isAdmin = false }: MapProp
   const [reportDialogOpen, setReportDialogOpen] = useState(false)
   const [reportLocation, setReportLocation] = useState<{ lat: number; lng: number } | null>(null)
   const [reportHydrant, setReportHydrant] = useState<Hydrant | null>(null)
+  const [isFindingNearest, setIsFindingNearest] = useState(false)
+  const [layerLastSync, setLayerLastSync] = useState<LayerSyncState>({
+    hydrants: null,
+    primarii: null,
+    subunitati: null,
+    polygons: null,
+    sevesoSituatii: null,
+  })
 
   const { user } = useAuth()
+
+  const updateLayerLastSync = useCallback((layer: keyof LayerSyncState, timestamp: number | null) => {
+    setLayerLastSync((previousState) => ({
+      ...previousState,
+      [layer]: timestamp,
+    }))
+  }, [])
+
+  const latestLayerSync = useMemo(() => {
+    const syncValues = Object.values(layerLastSync).filter((value): value is number => typeof value === "number")
+    return syncValues.length ? Math.max(...syncValues) : null
+  }, [layerLastSync])
+
+  const latestLayerSyncLabel = useMemo(
+    () => (latestLayerSync ? new Date(latestLayerSync).toLocaleString("ro-RO") : "Nesincronizat"),
+    [latestLayerSync],
+  )
+
+  const hydrantPoints = useMemo(
+    () =>
+      hydrants.reduce<HydrantPoint[]>((acc, hydrant, index) => {
+        const lat = Number.parseFloat(hydrant.Localizare.Latitudine)
+        const lng = Number.parseFloat(hydrant.Localizare.Longitudine)
+
+        if (!Number.isFinite(lat) || !Number.isFinite(lng)) {
+          return acc
+        }
+
+        acc.push({
+          hydrant,
+          lat,
+          lng,
+          markerKey: `${lat}-${lng}-${index}`,
+        })
+
+        return acc
+      }, []),
+    [hydrants],
+  )
+
+  const selectedHydrantDistance = useMemo(() => {
+    if (!selectedHydrant || !userLocation) return null
+
+    const lat = Number.parseFloat(selectedHydrant.Localizare.Latitudine)
+    const lng = Number.parseFloat(selectedHydrant.Localizare.Longitudine)
+    if (!Number.isFinite(lat) || !Number.isFinite(lng)) return null
+
+    return haversineDistanceKm(userLocation, { lat, lng })
+  }, [selectedHydrant, userLocation])
 
   // Compute map container style based on device orientation
   const mapContainerStyle = useMemo(
     () => ({
       width: "100%",
-      height: isMobile ? "calc(100vh - 56px)" : "calc(100vh - 64px)", // Adjust for bottom nav bar height
+      height: "100%",
     }),
-    [isMobile],
+    [],
   )
 
   // Default center in Romania
@@ -220,59 +465,90 @@ export function Map({ apiKey = "", hasAccess = false, isAdmin = false }: MapProp
     version: "weekly",
   })
 
-  // Get user location
+  // Get user location (doar în context securizat — evită erori pe http://IP din LAN)
   useEffect(() => {
-    if (navigator.geolocation) {
-      navigator.geolocation.getCurrentPosition(
-        (position) => {
-          setUserLocation({
-            lat: position.coords.latitude,
-            lng: position.coords.longitude,
-          })
-        },
-        (error) => {
-          console.error("Error getting user location:", error)
-        },
-      )
-    }
+    if (!canUseBrowserGeolocation()) return
+    navigator.geolocation.getCurrentPosition(
+      (position) => {
+        setUserLocation({
+          lat: position.coords.latitude,
+          lng: position.coords.longitude,
+        })
+      },
+      () => {
+        // refuz permisiune / timeout — utilizatorul poate apăsa din nou butonul de locație
+      },
+    )
   }, [])
 
   // Load hydrants data with caching
   useEffect(() => {
+    let isMounted = true
+
     const fetchHydrants = async () => {
+      let hasCachedHydrants = false
+
+      const cachedEntry = await readMapLayerCache<Hydrant[]>(MAP_LAYER_CACHE_KEYS.hydrants)
+      if (cachedEntry?.data && Array.isArray(cachedEntry.data) && cachedEntry.data.length > 0) {
+        hasCachedHydrants = true
+        const normalizedCachedHydrants = normalizeHydrants(cachedEntry.data)
+        if (isMounted) {
+          setHydrants(normalizedCachedHydrants)
+          setIsLoading(false)
+          updateLayerLastSync("hydrants", cachedEntry.lastSync)
+        }
+      }
+
+      if (typeof navigator !== "undefined" && !navigator.onLine && hasCachedHydrants) return
+
       try {
-        setIsLoading(true)
-        console.log("Încărcare hidranți direct de la sursă, fără cache")
-
-        // Adăugăm un parametru timestamp pentru a evita cache-ul browserului
-        const response = await fetch(`${HYDRANTS_DATA_URL}?t=${Date.now()}`)
-
-        if (!response.ok) {
-          throw new Error(`Eroare la încărcarea hidranților: ${response.status} ${response.statusText}`)
+        if (!hasCachedHydrants && isMounted) {
+          setIsLoading(true)
         }
 
-        const data = await response.json()
-        console.log(`Încărcați cu succes ${data.length} hidranți`)
+        const data = normalizeHydrants(await loadHydrantsData())
+        if (!Array.isArray(data) || data.length === 0) {
+          throw new Error("Nu există date pentru lista de hidranți")
+        }
 
+        if (!isMounted) return
+        const syncTimestamp = Date.now()
         setHydrants(data)
+        updateLayerLastSync("hydrants", syncTimestamp)
+        await writeMapLayerCache(MAP_LAYER_CACHE_KEYS.hydrants, data, syncTimestamp)
       } catch (error) {
+        if (!isMounted) return
+
         console.error("Eroare la încărcarea hidranților:", error)
-        toast({
-          title: "Eroare",
-          description: "Nu s-au putut încărca hidranții. Verificați conexiunea la internet.",
-          variant: "destructive",
-        })
+        if (hasCachedHydrants) {
+          toast({
+            title: "Conexiune instabilă",
+            description: "Sunt folosite datele de hidranți din cache.",
+          })
+        } else {
+          toast({
+            title: "Eroare",
+            description: "Nu s-au putut încărca hidranții. Verificați conexiunea la internet.",
+            variant: "destructive",
+          })
+        }
       } finally {
-        setIsLoading(false)
+        if (isMounted) {
+          setIsLoading(false)
+        }
       }
     }
 
     fetchHydrants()
-  }, [])
+
+    return () => {
+      isMounted = false
+    }
+  }, [updateLayerLastSync])
 
   // Update visible hydrants based on map bounds and zoom - with throttling
   useEffect(() => {
-    if (!mapBounds || hydrants.length === 0 || !isLoaded || !window.google) return
+    if (!mapBounds || hydrantPoints.length === 0 || !isLoaded) return
 
     // Clear any existing timeout to prevent multiple updates
     if (boundsChangeTimeoutRef.current) {
@@ -282,19 +558,18 @@ export function Map({ apiKey = "", hasAccess = false, isAdmin = false }: MapProp
     // Set a timeout to throttle the updates
     boundsChangeTimeoutRef.current = setTimeout(
       () => {
-        // Filter hydrants that are within the visible map bounds
-        const inBoundsHydrants = hydrants.filter((hydrant) => {
-          const lat = Number.parseFloat(hydrant.Localizare.Latitudine)
-          const lng = Number.parseFloat(hydrant.Localizare.Longitudine)
+        const northEast = mapBounds.getNorthEast()
+        const southWest = mapBounds.getSouthWest()
+        const north = northEast.lat()
+        const east = northEast.lng()
+        const south = southWest.lat()
+        const west = southWest.lng()
 
-          // Check if coordinates are within map bounds
-          try {
-            const latLng = new window.google.maps.LatLng(lat, lng)
-            return mapBounds.contains(latLng)
-          } catch (e) {
-            return false
-          }
-        })
+        const isLngInBounds = (lng: number) => (west <= east ? lng >= west && lng <= east : lng >= west || lng <= east)
+
+        const inBoundsHydrants = hydrantPoints.filter(
+          (hydrantPoint) => hydrantPoint.lat <= north && hydrantPoint.lat >= south && isLngInBounds(hydrantPoint.lng),
+        )
 
         // Limit the number of visible hydrants based on zoom and device
         let maxVisibleHydrants = isMobile ? 150 : 500
@@ -311,12 +586,12 @@ export function Map({ apiKey = "", hasAccess = false, isAdmin = false }: MapProp
           maxVisibleHydrants = Math.floor(maxVisibleHydrants * 0.6)
         }
 
-        const limitedHydrants =
+        const limitedHydrantPoints =
           inBoundsHydrants.length > maxVisibleHydrants
             ? inBoundsHydrants.slice(0, maxVisibleHydrants)
             : inBoundsHydrants
 
-        setVisibleHydrants(limitedHydrants)
+        setVisibleHydrantPoints(limitedHydrantPoints)
       },
       isMobile ? 400 : 300,
     ) // Longer throttle on mobile
@@ -327,20 +602,32 @@ export function Map({ apiKey = "", hasAccess = false, isAdmin = false }: MapProp
         clearTimeout(boundsChangeTimeoutRef.current)
       }
     }
-  }, [hydrants, mapBounds, zoom, isMobile, isLoaded, isLowEndDevice])
+  }, [hydrantPoints, mapBounds, zoom, isMobile, isLoaded, isLowEndDevice])
 
   // Load primarii data with caching
   useEffect(() => {
     if (!hasAccess) return
+    let isMounted = true
 
     const fetchPrimarii = async () => {
+      let hasCachedPrimarii = false
+
+      const cachedEntry = await readMapLayerCache<Primarie[]>(MAP_LAYER_CACHE_KEYS.primarii)
+      if (cachedEntry?.data && Array.isArray(cachedEntry.data) && cachedEntry.data.length > 0) {
+        hasCachedPrimarii = true
+        if (isMounted) {
+          setPrimarii(cachedEntry.data)
+          updateLayerLastSync("primarii", cachedEntry.lastSync)
+        }
+      }
+
+      if (typeof navigator !== "undefined" && !navigator.onLine && hasCachedPrimarii) return
+
       try {
         console.log("Încărcare primării direct de la sursă")
 
-        // Încărcăm datele direct, fără a verifica cache-ul
         const data = await loadPrimariiData()
 
-        // Filter out invalid entries
         const validData = data.filter(
           (primarie) =>
             primarie &&
@@ -353,59 +640,77 @@ export function Map({ apiKey = "", hasAccess = false, isAdmin = false }: MapProp
           console.warn(`Filtered out ${data.length - validData.length} primarii with invalid coordinates`)
         }
 
+        const syncTimestamp = Date.now()
+        await writeMapLayerCache(MAP_LAYER_CACHE_KEYS.primarii, validData, syncTimestamp)
+
+        if (!isMounted) return
         setPrimarii(validData)
+        updateLayerLastSync("primarii", syncTimestamp)
       } catch (error) {
         console.error("Eroare la încărcarea primăriilor:", error)
-        toast({
-          title: "Eroare",
-          description: "Nu s-au putut încărca primăriile. Verificați conexiunea la internet.",
-          variant: "destructive",
-        })
+        if (!hasCachedPrimarii) {
+          toast({
+            title: "Eroare",
+            description: "Nu s-au putut încărca primăriile. Verificați conexiunea la internet.",
+            variant: "destructive",
+          })
+        }
       }
     }
 
     fetchPrimarii()
-  }, [hasAccess])
+
+    return () => {
+      isMounted = false
+    }
+  }, [hasAccess, updateLayerLastSync])
 
   // Load subunitati data with caching
   useEffect(() => {
     if (!hasAccess) return
+    let isMounted = true
 
     const fetchSubunitati = async () => {
-      try {
-        // Check cache first
-        const cachedData = localStorage.getItem("subunitatiData")
-        const cachedTimestamp = localStorage.getItem("subunitatiTimestamp")
-        const now = new Date().getTime()
+      let hasCachedSubunitati = false
 
-        // Use cache if it exists and is less than 24 hours old
-        if (cachedData && cachedTimestamp && now - Number.parseInt(cachedTimestamp) < 24 * 60 * 60 * 1000) {
-          const data = JSON.parse(cachedData)
-          setSubunitati(data)
-          return
+      const cachedEntry = await readMapLayerCache<Subunitate[]>(MAP_LAYER_CACHE_KEYS.subunitati)
+      if (cachedEntry?.data && Array.isArray(cachedEntry.data) && cachedEntry.data.length > 0) {
+        hasCachedSubunitati = true
+        if (isMounted) {
+          setSubunitati(cachedEntry.data)
+          updateLayerLastSync("subunitati", cachedEntry.lastSync)
         }
+      }
 
-        // Otherwise, load data from source
+      if (typeof navigator !== "undefined" && !navigator.onLine && hasCachedSubunitati) return
+
+      try {
         const data = await loadSubunitatiData()
 
-        // Save data to localStorage for later use
-        localStorage.setItem("subunitatiData", JSON.stringify(data))
-        localStorage.setItem("subunitatiTimestamp", now.toString())
+        const syncTimestamp = Date.now()
+        await writeMapLayerCache(MAP_LAYER_CACHE_KEYS.subunitati, data, syncTimestamp)
 
+        if (!isMounted) return
         setSubunitati(data)
+        updateLayerLastSync("subunitati", syncTimestamp)
       } catch (error) {
         console.error("Error fetching subunits:", error)
-
-        // In case of error, try to use cached data if it exists
-        const cachedData = localStorage.getItem("subunitatiData")
-        if (cachedData) {
-          setSubunitati(JSON.parse(cachedData))
+        if (!hasCachedSubunitati) {
+          toast({
+            title: "Eroare",
+            description: "Nu s-au putut încărca subunitățile. Verificați conexiunea la internet.",
+            variant: "destructive",
+          })
         }
       }
     }
 
     fetchSubunitati()
-  }, [hasAccess])
+
+    return () => {
+      isMounted = false
+    }
+  }, [hasAccess, updateLayerLastSync])
 
   // Load SEVESO data with caching
   useEffect(() => {
@@ -427,7 +732,6 @@ export function Map({ apiKey = "", hasAccess = false, isAdmin = false }: MapProp
           toast({
             title: "Avertisment",
             description: `${invalidSeveso.length} obiective SEVESO nu au ID-uri valide și vor fi ignorate.`,
-            variant: "warning",
           })
         }
 
@@ -448,8 +752,23 @@ export function Map({ apiKey = "", hasAccess = false, isAdmin = false }: MapProp
   // Încărcăm toate situațiile SEVESO pentru toate obiectivele când se încarcă harta
   useEffect(() => {
     if (!hasAccess || !seveso.length) return
+    let isMounted = true
 
     const fetchAllSituatii = async () => {
+      let hasCachedSituatii = false
+
+      const cachedEntry = await readMapLayerCache<SituatieSeveso[]>(MAP_LAYER_CACHE_KEYS.sevesoSituatii)
+      if (cachedEntry?.data && Array.isArray(cachedEntry.data) && cachedEntry.data.length > 0) {
+        hasCachedSituatii = true
+        if (isMounted) {
+          setAllSituatiiSeveso(cachedEntry.data)
+          setActiveSituatii(cachedEntry.data.map((s) => s.id))
+          updateLayerLastSync("sevesoSituatii", cachedEntry.lastSync)
+        }
+      }
+
+      if (typeof navigator !== "undefined" && !navigator.onLine && hasCachedSituatii) return
+
       try {
         console.log("Fetching all SEVESO situations for all objectives")
         const allSituatii: SituatieSeveso[] = []
@@ -461,7 +780,6 @@ export function Map({ apiKey = "", hasAccess = false, isAdmin = false }: MapProp
           toast({
             title: "Avertisment",
             description: `${invalidSeveso.length} obiective SEVESO nu au ID-uri valide și vor fi ignorate.`,
-            variant: "warning",
           })
         }
 
@@ -476,22 +794,33 @@ export function Map({ apiKey = "", hasAccess = false, isAdmin = false }: MapProp
         }
 
         console.log(`Total SEVESO situations loaded: ${allSituatii.length}`)
+        const syncTimestamp = Date.now()
+        await writeMapLayerCache(MAP_LAYER_CACHE_KEYS.sevesoSituatii, allSituatii, syncTimestamp)
+
+        if (!isMounted) return
         setAllSituatiiSeveso(allSituatii)
+        updateLayerLastSync("sevesoSituatii", syncTimestamp)
 
         // Activăm toate situațiile implicit
         setActiveSituatii(allSituatii.map((s) => s.id))
       } catch (error) {
         console.error("Error fetching all SEVESO situations:", error)
-        toast({
-          title: "Eroare",
-          description: "Nu s-au putut încărca toate situațiile SEVESO.",
-          variant: "destructive",
-        })
+        if (!hasCachedSituatii) {
+          toast({
+            title: "Eroare",
+            description: "Nu s-au putut încărca toate situațiile SEVESO.",
+            variant: "destructive",
+          })
+        }
       }
     }
 
     fetchAllSituatii()
-  }, [hasAccess, seveso])
+
+    return () => {
+      isMounted = false
+    }
+  }, [hasAccess, seveso, updateLayerLastSync])
 
   // Load SEVESO situations when a SEVESO location is selected
   useEffect(() => {
@@ -547,9 +876,49 @@ export function Map({ apiKey = "", hasAccess = false, isAdmin = false }: MapProp
 
   // Load polygon data with progressive loading for mobile
   useEffect(() => {
+    let isMounted = true
+    let delayedLoadTimer: ReturnType<typeof setTimeout> | null = null
+
     const fetchPolygonData = async () => {
-      setLoadingPolygons(true)
-      const allPolygonData = {}
+      let hasCachedPolygons = false
+      let allPolygonData: { [key: string]: Array<{ lat: number; lng: number }> } = {}
+
+      const cachedEntry = await readMapLayerCache<{ [key: string]: Array<{ lat: number; lng: number }> }>(
+        MAP_LAYER_CACHE_KEYS.polygons,
+      )
+
+      if (cachedEntry?.data && Object.keys(cachedEntry.data).length > 0) {
+        hasCachedPolygons = true
+        allPolygonData = { ...cachedEntry.data }
+
+        if (isMounted) {
+          setPolygonData(allPolygonData)
+          visibleRaionsHydratedRef.current = true
+          setVisibleRaions(resolveVisibleRaionsForLoad(isMobile))
+          setLoadingPolygons(false)
+          updateLayerLastSync("polygons", cachedEntry.lastSync)
+        }
+      } else if (isMounted) {
+        setLoadingPolygons(true)
+      }
+
+      if (typeof navigator !== "undefined" && !navigator.onLine && hasCachedPolygons) return
+
+      const snapshotData = await loadPolygonDataFromSnapshot()
+      if (Object.keys(snapshotData).length > 0) {
+        allPolygonData = { ...snapshotData }
+
+        if (!isMounted) return
+
+        setPolygonData({ ...allPolygonData })
+        visibleRaionsHydratedRef.current = true
+        setVisibleRaions(resolveVisibleRaionsForLoad(isMobile))
+        setLoadingPolygons(false)
+        const snapshotSyncTimestamp = Date.now()
+        updateLayerLastSync("polygons", snapshotSyncTimestamp)
+        await writeMapLayerCache(MAP_LAYER_CACHE_KEYS.polygons, allPolygonData, snapshotSyncTimestamp)
+        return
+      }
 
       // For mobile devices, load only a subset of raions initially
       const raionsToLoad = isMobile ? availableRaions.slice(0, 3) : availableRaions
@@ -578,13 +947,19 @@ export function Map({ apiKey = "", hasAccess = false, isAdmin = false }: MapProp
         }
       })
 
-      setPolygonData(allPolygonData)
-      setVisibleRaions(raionsToLoad)
+      if (!isMounted) return
+
+      setPolygonData({ ...allPolygonData })
+      visibleRaionsHydratedRef.current = true
+      setVisibleRaions(resolveVisibleRaionsForLoad(isMobile))
       setLoadingPolygons(false)
+      const firstSyncTimestamp = Date.now()
+      updateLayerLastSync("polygons", firstSyncTimestamp)
+      await writeMapLayerCache(MAP_LAYER_CACHE_KEYS.polygons, allPolygonData, firstSyncTimestamp)
 
       // If on mobile, load the remaining raions in the background
       if (isMobile) {
-        setTimeout(async () => {
+        delayedLoadTimer = setTimeout(async () => {
           const remainingRaions = availableRaions.slice(3)
           const remainingPromises = remainingRaions.map(async (raion) => {
             try {
@@ -597,21 +972,41 @@ export function Map({ apiKey = "", hasAccess = false, isAdmin = false }: MapProp
 
           const remainingResults = await Promise.all(remainingPromises)
 
-          setPolygonData((prevData) => {
-            const newData = { ...prevData }
-            remainingResults.forEach((result) => {
-              if (result) {
-                Object.assign(newData, result)
-              }
-            })
-            return newData
+          if (!isMounted) return
+
+          remainingResults.forEach((result) => {
+            if (result) {
+              Object.assign(allPolygonData, result)
+            }
           })
+
+          setPolygonData({ ...allPolygonData })
+          const syncTimestamp = Date.now()
+          updateLayerLastSync("polygons", syncTimestamp)
+          await writeMapLayerCache(MAP_LAYER_CACHE_KEYS.polygons, allPolygonData, syncTimestamp)
         }, 5000) // Delay loading of remaining raions
       }
     }
 
-    fetchPolygonData()
-  }, [isMobile])
+    fetchPolygonData().catch((error) => {
+      console.error("Error loading polygon data:", error)
+      if (isMounted) {
+        setLoadingPolygons(false)
+      }
+    })
+
+    return () => {
+      isMounted = false
+      if (delayedLoadTimer) {
+        clearTimeout(delayedLoadTimer)
+      }
+    }
+  }, [isMobile, updateLayerLastSync])
+
+  useEffect(() => {
+    if (!visibleRaionsHydratedRef.current) return
+    writeStoredVisibleRaions(visibleRaions)
+  }, [visibleRaions])
 
   // Create marker icons
   useEffect(() => {
@@ -664,6 +1059,7 @@ export function Map({ apiKey = "", hasAccess = false, isAdmin = false }: MapProp
       setSelectedHydrant(null)
       setSelectedPrimarie(null)
       setSelectedSubunitate(null)
+      setSelectedRaion(null)
 
       // Clear the searched location marker
       setSearchedLocationMarker(null)
@@ -726,11 +1122,25 @@ export function Map({ apiKey = "", hasAccess = false, isAdmin = false }: MapProp
         showTooltip: true,
       })
 
+      setSelectedRaion(null)
+
       // Clear the clickedLocation if it exists
       setClickedLocation(null)
     },
     [polygonData, mapRef],
   )
+
+  const { registerMapLocationSelectHandler, setMapsScriptReady } = useMapLocationSearchBridge()
+
+  useEffect(() => {
+    registerMapLocationSelectHandler(handleLocationSelect)
+    return () => registerMapLocationSelectHandler(null)
+  }, [registerMapLocationSelectHandler, handleLocationSelect])
+
+  useEffect(() => {
+    const ready = Boolean(typeof window !== "undefined" && isLoaded && window.google?.maps)
+    setMapsScriptReady(ready)
+  }, [isLoaded, setMapsScriptReady])
 
   // Get directions to a location
   const getDirections = useCallback(
@@ -741,87 +1151,313 @@ export function Map({ apiKey = "", hasAccess = false, isAdmin = false }: MapProp
     [userLocation],
   )
 
-  // Get current location
-  const handleGetLocation = useCallback(() => {
-    if (navigator.geolocation) {
+  const requestCurrentLocation = useCallback(async ({ showErrorToast = true }: { showErrorToast?: boolean } = {}) => {
+    if (typeof navigator === "undefined" || !navigator.geolocation) {
+      if (showErrorToast) {
+        toast({
+          title: "Eroare",
+          description: "Geolocația nu este suportată de acest browser.",
+          variant: "destructive",
+        })
+      }
+      throw new Error("Geolocation is not supported")
+    }
+
+    if (isInsecureGeolocationContext()) {
+      if (showErrorToast) {
+        toast({
+          title: "Geolocație indisponibilă pe acest link",
+          description:
+            "Browserul permite locația doar pe HTTPS sau localhost. Rulează „npm run dev:https” și deschide linkul https din terminal, sau folosește un tunel (ex. ngrok).",
+          variant: "destructive",
+        })
+      }
+      throw new Error("Geolocation requires a secure context")
+    }
+
+    const permissionState = await getGeolocationPermissionState()
+
+    return new Promise<{ lat: number; lng: number }>((resolve, reject) => {
       navigator.geolocation.getCurrentPosition(
         (position) => {
-          const newLocation = {
+          resolve({
             lat: position.coords.latitude,
             lng: position.coords.longitude,
-          }
-          setUserLocation(newLocation)
-          if (mapRef) {
-            mapRef.panTo(newLocation)
-            mapRef.setZoom(16)
-          }
-        },
-        (error) => {
-          console.error("Error getting user location:", error)
-          toast({
-            title: "Eroare",
-            description: "Nu s-a putut obține locația. Verificați permisiunile browserului.",
-            variant: "destructive",
           })
         },
+        (error) => {
+          if (showErrorToast) {
+            toastGeolocationError(permissionState, error?.code)
+          }
+          reject(error)
+        },
+        {
+          enableHighAccuracy: true,
+          timeout: 15000,
+          maximumAge: 0,
+        },
       )
-    } else {
+    })
+  }, [])
+
+  // Get current location
+  const handleGetLocation = useCallback(async () => {
+    try {
+      const newLocation = await requestCurrentLocation()
+      setUserLocation(newLocation)
+      if (mapRef) {
+        mapRef.panTo(newLocation)
+        mapRef.setZoom(16)
+      }
+    } catch {
+      // Error handled in requestCurrentLocation
+    }
+  }, [mapRef, requestCurrentLocation])
+
+  const resolveReportCoordinates = useCallback(async () => {
+    try {
+      const currentLocation = await requestCurrentLocation({ showErrorToast: false })
+      setUserLocation(currentLocation)
+      return currentLocation
+    } catch (error) {
+      const code = error && typeof error === "object" && "code" in error ? Number((error as GeolocationPositionError).code) : undefined
+      if (code === 1) {
+        const perm = await getGeolocationPermissionState()
+        toast({
+          title: "Locație refuzată",
+          description:
+            perm === "denied"
+              ? "Folosim centrul hărții. Activează locația din setările site-ului, apoi încearcă din nou raportarea."
+              : "Folosim centrul hărții. Permite locația dacă browserul întreabă, apoi poți reîncerca.",
+          variant: "destructive",
+        })
+      }
+
+      if (mapRef) {
+        const center = mapRef.getCenter()
+        if (center) {
+          return { lat: center.lat(), lng: center.lng() }
+        }
+      }
+
+      if (userLocation) {
+        return userLocation
+      }
+
+      throw new Error("Nu s-au putut determina coordonatele pentru semnalare")
+    }
+  }, [mapRef, requestCurrentLocation, userLocation])
+
+  const handleStartNewHydrantReport = useCallback(async () => {
+    if (!user) {
       toast({
-        title: "Eroare",
-        description: "Geolocația nu este suportată de acest browser.",
+        title: "Autentificare necesară",
+        description: "Trebuie să fiți autentificat pentru a semnala hidranți noi.",
+        variant: "destructive",
+      })
+      return
+    }
+
+    try {
+      const reportCoordinates = await resolveReportCoordinates()
+      setReportHydrant(null)
+      setReportLocation(reportCoordinates)
+      setReportDialogOpen(true)
+
+      if (mapRef) {
+        mapRef.panTo(reportCoordinates)
+        mapRef.setZoom(Math.max(mapRef.getZoom() || 16, 16))
+      }
+    } catch (error) {
+      console.error("Nu s-a putut inițializa semnalarea pentru hidrant nou:", error)
+      toast({
+        title: "Coordonate indisponibile",
+        description: "Nu am putut prelua poziția curentă. Încearcă din nou.",
         variant: "destructive",
       })
     }
-  }, [mapRef])
+  }, [mapRef, resolveReportCoordinates, user])
 
   // Find nearest hydrant
-  const findNearestHydrant = useCallback(() => {
-    if (!userLocation || hydrants.length === 0) return
-
-    // Function to calculate distance (haversine formula)
-    const haversineDistance = (coords1: { lat: number; lng: number }, coords2: { lat: number; lng: number }) => {
-      const toRad = (x: number) => (x * Math.PI) / 180
-      const R = 6371 // Earth radius in km
-      const dLat = toRad(coords2.lat - coords1.lat)
-      const dLon = toRad(coords2.lng - coords1.lng)
-      const lat1 = toRad(coords1.lat)
-      const lat2 = toRad(coords2.lat)
-
-      const a =
-        Math.sin(dLat / 2) * Math.sin(dLat / 2) +
-        Math.sin(dLon / 2) * Math.sin(dLon / 2) * Math.cos(lat1) * Math.cos(lat2)
-      const c = 2 * Math.atan2(Math.sqrt(a), Math.sqrt(1 - a))
-      return R * c // Distance in km
+  const findNearestHydrant = useCallback(async () => {
+    if (isFindingNearest) return
+    if (hydrantPoints.length === 0) {
+      toast({
+        title: "Date indisponibile",
+        description: "Lista de hidranți nu este încărcată încă.",
+        variant: "destructive",
+      })
+      return
     }
 
-    let nearestHydrant = null
+    setIsFindingNearest(true)
+    let nearestHydrantPoint: HydrantPoint | undefined
     let minDistance = Number.POSITIVE_INFINITY
 
-    hydrants.forEach((hydrant) => {
-      const hydrantCoords = {
-        lat: Number.parseFloat(hydrant.Localizare.Latitudine),
-        lng: Number.parseFloat(hydrant.Localizare.Longitudine),
+    try {
+      const currentLocation = userLocation ?? (await requestCurrentLocation())
+      if (!userLocation) {
+        setUserLocation(currentLocation)
       }
 
-      const distance = haversineDistance(userLocation, hydrantCoords)
+      for (const hydrantPoint of hydrantPoints) {
+        const distance = haversineDistanceKm(currentLocation, {
+          lat: hydrantPoint.lat,
+          lng: hydrantPoint.lng,
+        })
 
-      if (distance < minDistance) {
-        minDistance = distance
-        nearestHydrant = hydrant
+        if (distance < minDistance) {
+          minDistance = distance
+          nearestHydrantPoint = hydrantPoint
+        }
       }
-    })
 
-    if (nearestHydrant) {
-      setSelectedHydrant(nearestHydrant)
+      if (!nearestHydrantPoint) {
+        toast({
+          title: "Hidrant negăsit",
+          description: "Nu am putut identifica un hidrant apropiat.",
+          variant: "destructive",
+        })
+        return
+      }
+
+      setSelectedHydrant(nearestHydrantPoint.hydrant)
       if (mapRef) {
         mapRef.panTo({
-          lat: Number.parseFloat(nearestHydrant.Localizare.Latitudine),
-          lng: Number.parseFloat(nearestHydrant.Localizare.Longitudine),
+          lat: nearestHydrantPoint.lat,
+          lng: nearestHydrantPoint.lng,
         })
         mapRef.setZoom(16)
       }
+
+      toast({
+        title: "Hidrant identificat",
+        description: `Cel mai apropiat hidrant este la aproximativ ${formatDistance(minDistance)}.`,
+      })
+    } catch {
+      // Error handled in requestCurrentLocation
+    } finally {
+      setIsFindingNearest(false)
     }
-  }, [hydrants, userLocation, mapRef])
+  }, [hydrantPoints, isFindingNearest, mapRef, requestCurrentLocation, userLocation])
+
+  const findNearestHydrantLabel = isFindingNearest ? "Caut..." : "Cel mai apropiat hidrant"
+
+  const nearestHydrantButton = (
+    <Button
+      variant="secondary"
+      size="icon"
+      className="rounded-full shadow-md bg-blue-500 text-white hover:bg-blue-600"
+      onClick={findNearestHydrant}
+      title={findNearestHydrantLabel}
+      type="button"
+      disabled={isFindingNearest}
+      aria-label={findNearestHydrantLabel}
+    >
+      <MdFireHydrantAlt size={20} />
+    </Button>
+  )
+
+  const nearestHydrantMobileButton = (
+    <Button
+      variant="ghost"
+      size="icon"
+      className={`h-12 w-12 text-blue-600 ${isFindingNearest ? "opacity-70" : ""}`}
+      onClick={findNearestHydrant}
+      type="button"
+      disabled={isFindingNearest}
+      aria-label={findNearestHydrantLabel}
+    >
+      <div className="flex flex-col items-center">
+        <MdFireHydrantAlt size={24} />
+        <span className="text-[10px] mt-1">{isFindingNearest ? "Caut..." : "Apropiat"}</span>
+      </div>
+    </Button>
+  )
+
+  const renderCallAction = (label: string, phoneNumber?: string | number | null) => {
+    const href = toTelHref(phoneNumber)
+    if (!href) return null
+
+    return (
+      <Button variant="outline" size="lg" className="h-12 w-full justify-start text-base" asChild>
+        <a href={href}>
+          <MdCall size={18} className="mr-2" />
+          {label}
+        </a>
+      </Button>
+    )
+  }
+
+  const selectedHydrantPosition = useMemo(() => {
+    if (!selectedHydrant) return null
+
+    const lat = Number.parseFloat(selectedHydrant.Localizare.Latitudine)
+    const lng = Number.parseFloat(selectedHydrant.Localizare.Longitudine)
+    if (!Number.isFinite(lat) || !Number.isFinite(lng)) return null
+
+    return { lat, lng }
+  }, [selectedHydrant])
+
+  const selectedRaionDetails = useMemo(() => {
+    if (!selectedRaion) return null
+
+    const match = Object.entries(polygonData).find(([raionName]) => getRaionSlugFromPolygonKey(raionName) === selectedRaion)
+    const coordinates = match?.[1] ?? []
+    const center = calculatePolygonCenter(coordinates)
+
+    return {
+      id: selectedRaion,
+      label: formatRaionLabel(selectedRaion),
+      pointsCount: coordinates.length,
+      center,
+      color: raionColors[selectedRaion] || "rgba(244,67,54,0.8)",
+    }
+  }, [polygonData, selectedRaion])
+
+  const isOnlySelectedRaionVisible = useMemo(
+    () => Boolean(selectedRaion && visibleRaions.length === 1 && visibleRaions[0] === selectedRaion),
+    [selectedRaion, visibleRaions],
+  )
+
+  const areAllRaionsVisible = visibleRaions.length === availableRaions.length
+
+  const handleRaionPolygonClick = useCallback(
+    (raion: string) => {
+      if (!isMobile) return
+
+      setSelectedRaion(raion)
+      if (!isEditingSituatie) {
+        setSelectedSeveso(null)
+      }
+      setSelectedHydrant(null)
+      setSelectedPrimarie(null)
+      setSelectedSubunitate(null)
+      setSearchedLocationMarker(null)
+    },
+    [isEditingSituatie, isMobile],
+  )
+
+  const mobileSelectionType = useMemo<"hydrant" | "primarie" | "subunitate" | "seveso" | "raion" | "search" | null>(() => {
+    if (selectedHydrant) return "hydrant"
+    if (selectedPrimarie) return "primarie"
+    if (selectedSubunitate) return "subunitate"
+    if (selectedSeveso) return "seveso"
+    if (selectedRaionDetails) return "raion"
+    if (searchedLocationMarker?.showTooltip) return "search"
+    return null
+  }, [searchedLocationMarker, selectedHydrant, selectedPrimarie, selectedRaionDetails, selectedSeveso, selectedSubunitate])
+
+  const closeMobileDetailsSheet = useCallback(() => {
+    setSelectedHydrant(null)
+    setSelectedPrimarie(null)
+    setSelectedSubunitate(null)
+    setSelectedSeveso(null)
+    setSelectedRaion(null)
+    setSearchedLocationMarker(null)
+  }, [])
+
+  const isMobileDetailsSheetOpen = isMobile && mobileSelectionType !== null
 
   const handleReportHydrant = useCallback(
     (hydrant: Hydrant) => {
@@ -875,8 +1511,8 @@ export function Map({ apiKey = "", hasAccess = false, isAdmin = false }: MapProp
 
   // Toggle polygon controls
   const togglePolygonControls = useCallback(() => {
-    setShowPolygonControls(!showPolygonControls)
-  }, [showPolygonControls])
+    setShowPolygonControls((previousState) => !previousState)
+  }, [])
 
   // Toggle raion visibility
   const toggleRaion = useCallback((raion: string) => {
@@ -1137,18 +1773,7 @@ export function Map({ apiKey = "", hasAccess = false, isAdmin = false }: MapProp
   }
 
   return (
-    <div className="flex-1 relative" id="map-container" ref={mapContainerRef}>
-      {/* Search bar - optimized for mobile */}
-      <div
-        className={`absolute ${isMobile ? "top-14" : "top-4"} left-1/2 transform -translate-x-1/2 z-10 w-full ${
-          isMobile ? "max-w-[90%]" : "max-w-md"
-        } px-4`}
-      >
-        <LocationSearch onLocationSelect={handleLocationSelect} />
-      </div>
-
-      {/* Location info - centered on screen with close button */}
-
+    <div className="flex-1 relative h-full min-h-0 w-full" id="map-container" ref={mapContainerRef}>
       {isLoaded && window.google && (
         <GoogleMap
           mapContainerStyle={mapContainerStyle}
@@ -1164,13 +1789,7 @@ export function Map({ apiKey = "", hasAccess = false, isAdmin = false }: MapProp
           {/* Polygon data - optimized for mobile */}
           {!loadingPolygons &&
             Object.entries(polygonData).map(([raionName, coordinates]) => {
-              // Extract raion name from variable
-              let raion = raionName.replace(/Coordinates$/, "").toLowerCase()
-
-              // Check for coordonate[Raion] format
-              if (raionName.startsWith("coordonate")) {
-                raion = raionName.replace(/^coordonate/, "").toLowerCase()
-              }
+              const raion = getRaionSlugFromPolygonKey(raionName)
 
               // Check if raion is visible
               if (!visibleRaions.includes(raion)) return null
@@ -1180,16 +1799,27 @@ export function Map({ apiKey = "", hasAccess = false, isAdmin = false }: MapProp
                 return null
               }
 
+              const isSelectedRaion = selectedRaion === raion
+
               // Polygon options
               const polygonOptions = {
                 fillColor: raionColors[raion] || "#FF0000",
-                fillOpacity: 0.4,
+                fillOpacity: isSelectedRaion ? 0.5 : 0.4,
                 strokeColor: raionColors[raion] || "#FF0000",
                 strokeOpacity: 0.8,
-                strokeWeight: 2,
+                strokeWeight: isSelectedRaion ? 3 : 2,
+                zIndex: isSelectedRaion ? 6 : 1,
+                clickable: true,
               }
 
-              return <Polygon key={raionName} paths={coordinates} options={polygonOptions} />
+              return (
+                <Polygon
+                  key={raionName}
+                  paths={coordinates}
+                  options={polygonOptions}
+                  onClick={() => handleRaionPolygonClick(raion)}
+                />
+              )
             })}
 
           {/* Subunitate markers */}
@@ -1209,6 +1839,7 @@ export function Map({ apiKey = "", hasAccess = false, isAdmin = false }: MapProp
                   setSelectedHydrant(null)
                   setSelectedPrimarie(null)
                   setSelectedSeveso(null)
+                  setSelectedRaion(null)
                 }}
                 icon={subunitateIcon}
                 zIndex={3}
@@ -1232,6 +1863,7 @@ export function Map({ apiKey = "", hasAccess = false, isAdmin = false }: MapProp
                   setSelectedHydrant(null)
                   setSelectedPrimarie(null)
                   setSelectedSubunitate(null)
+                  setSelectedRaion(null)
                 }}
                 icon={sevesoIcon}
                 zIndex={4}
@@ -1292,6 +1924,7 @@ export function Map({ apiKey = "", hasAccess = false, isAdmin = false }: MapProp
                     setSelectedHydrant(null)
                     setSelectedSubunitate(null)
                     setSelectedSeveso(null)
+                    setSelectedRaion(null)
                   }}
                   icon={primarieIcon}
                   zIndex={2}
@@ -1299,22 +1932,23 @@ export function Map({ apiKey = "", hasAccess = false, isAdmin = false }: MapProp
               ))}
 
           {/* Hydrant markers with clustering */}
-          {mapRef && hydrantIcon && showHydrants && visibleHydrants.length > 0 && (
+          {mapRef && hydrantIcon && showHydrants && visibleHydrantPoints.length > 0 && (
             <MarkerClusterer options={clusterOptions}>
               {(clusterer) => (
                 <>
-                  {visibleHydrants.map((hydrant, index) => (
+                  {visibleHydrantPoints.map((hydrantPoint) => (
                     <Marker
-                      key={`${hydrant.Localizare.Latitudine}-${hydrant.Localizare.Longitudine}-${index}`}
+                      key={hydrantPoint.markerKey}
                       position={{
-                        lat: Number.parseFloat(hydrant.Localizare.Latitudine),
-                        lng: Number.parseFloat(hydrant.Localizare.Longitudine),
+                        lat: hydrantPoint.lat,
+                        lng: hydrantPoint.lng,
                       }}
                       onClick={() => {
-                        setSelectedHydrant(hydrant)
+                        setSelectedHydrant(hydrantPoint.hydrant)
                         setSelectedPrimarie(null)
                         setSelectedSubunitate(null)
                         setSelectedSeveso(null)
+                        setSelectedRaion(null)
                       }}
                       icon={hydrantIcon}
                       clusterer={clusterer}
@@ -1360,7 +1994,7 @@ export function Map({ apiKey = "", hasAccess = false, isAdmin = false }: MapProp
                 }}
                 zIndex={6}
               />
-              {searchedLocationMarker.showTooltip && (
+              {!isMobile && searchedLocationMarker.showTooltip && (
                 <InfoWindow
                   position={{
                     lat: searchedLocationMarker.lat,
@@ -1394,12 +2028,9 @@ export function Map({ apiKey = "", hasAccess = false, isAdmin = false }: MapProp
           )}
 
           {/* InfoWindow for selected hydrant */}
-          {selectedHydrant && (
+          {!isMobile && selectedHydrant && selectedHydrantPosition && (
             <InfoWindow
-              position={{
-                lat: Number.parseFloat(selectedHydrant.Localizare.Latitudine),
-                lng: Number.parseFloat(selectedHydrant.Localizare.Longitudine),
-              }}
+              position={selectedHydrantPosition}
               onCloseClick={() => setSelectedHydrant(null)}
             >
               <Card className="w-[300px] border-none shadow-none">
@@ -1421,6 +2052,11 @@ export function Map({ apiKey = "", hasAccess = false, isAdmin = false }: MapProp
                   <div>
                     <span className="font-semibold">Reper:</span> {selectedHydrant.Reper}
                   </div>
+                  {typeof selectedHydrantDistance === "number" && (
+                    <div>
+                      <span className="font-semibold">Distanță față de tine:</span> {formatDistance(selectedHydrantDistance)}
+                    </div>
+                  )}
                   <div className="flex flex-wrap gap-2">
                     <span className="font-semibold">Tip:</span>
                     {selectedHydrant.TipHidrant.Suprateran && <Badge variant="outline">Suprateran</Badge>}
@@ -1473,7 +2109,7 @@ export function Map({ apiKey = "", hasAccess = false, isAdmin = false }: MapProp
           )}
 
           {/* InfoWindow for selected primarie */}
-          {selectedPrimarie && (
+          {!isMobile && selectedPrimarie && (
             <InfoWindow
               position={{
                 lat: selectedPrimarie.coordinates.latitude,
@@ -1549,7 +2185,7 @@ export function Map({ apiKey = "", hasAccess = false, isAdmin = false }: MapProp
           )}
 
           {/* InfoWindow for selected subunitate */}
-          {selectedSubunitate && (
+          {!isMobile && selectedSubunitate && (
             <InfoWindow
               position={{
                 lat: selectedSubunitate.coordinates.latitude,
@@ -1596,7 +2232,7 @@ export function Map({ apiKey = "", hasAccess = false, isAdmin = false }: MapProp
           )}
 
           {/* InfoWindow for selected SEVESO location */}
-          {selectedSeveso && (
+          {!isMobile && selectedSeveso && (
             <InfoWindow
               position={{
                 lat: selectedSeveso.coordinates.latitude,
@@ -1769,6 +2405,254 @@ export function Map({ apiKey = "", hasAccess = false, isAdmin = false }: MapProp
         </GoogleMap>
       )}
 
+      {isMobile && (
+        <Sheet
+          open={isMobileDetailsSheetOpen}
+          onOpenChange={(open) => {
+            if (!open) closeMobileDetailsSheet()
+          }}
+        >
+          <SheetContent side="bottom" className="max-h-[78vh] overflow-y-auto rounded-t-2xl px-4 pb-[calc(env(safe-area-inset-bottom)+5.5rem)]">
+            {mobileSelectionType === "hydrant" && selectedHydrant && (
+              <>
+                <SheetHeader className="pr-8">
+                  <SheetTitle>Hidrant {selectedHydrant.NumărAdministrativ || "fără număr"}</SheetTitle>
+                  <SheetDescription>
+                    {selectedHydrant.Stradă} {selectedHydrant.NumărAdministrativ || ""}, {selectedHydrant.Localitate}
+                  </SheetDescription>
+                </SheetHeader>
+                <div className="mt-4 space-y-3">
+                  <div className="flex items-center gap-2 text-sm">
+                    <span className="font-semibold">Stare:</span>
+                    {selectedHydrant["Stare hidrant"]?.Funcțional ? (
+                      <Badge className="bg-green-500">Funcțional</Badge>
+                    ) : (
+                      <Badge variant="destructive">Nefuncțional</Badge>
+                    )}
+                    {typeof selectedHydrantDistance === "number" && (
+                      <Badge variant="secondary">{formatDistance(selectedHydrantDistance)}</Badge>
+                    )}
+                  </div>
+                  {selectedHydrant.Reper && (
+                    <p className="text-sm text-muted-foreground">
+                      <span className="font-semibold text-foreground">Reper:</span> {selectedHydrant.Reper}
+                    </p>
+                  )}
+                  <div className="space-y-2 pt-1">
+                    <Button
+                      className="h-12 w-full text-base"
+                      size="lg"
+                      onClick={() =>
+                        getDirections(
+                          Number.parseFloat(selectedHydrant.Localizare.Latitudine),
+                          Number.parseFloat(selectedHydrant.Localizare.Longitudine),
+                        )
+                      }
+                      type="button"
+                    >
+                      <MdDirections size={18} className="mr-2" /> Navighează la hidrant
+                    </Button>
+                    <Button
+                      variant="outline"
+                      className="h-12 w-full text-base"
+                      size="lg"
+                      onClick={() => handleReportHydrant(selectedHydrant)}
+                      type="button"
+                    >
+                      <MdReportProblem size={18} className="mr-2" /> Raportează problemă
+                    </Button>
+                  </div>
+                </div>
+              </>
+            )}
+
+            {mobileSelectionType === "primarie" && selectedPrimarie && (
+              <>
+                <SheetHeader className="pr-8">
+                  <SheetTitle>{selectedPrimarie.numePrimarie}</SheetTitle>
+                  <SheetDescription>{selectedPrimarie.Adresa || "Primărie"}</SheetDescription>
+                </SheetHeader>
+                <div className="mt-4 space-y-3">
+                  <p className="text-sm text-muted-foreground">
+                    <span className="font-semibold text-foreground">Primar:</span> {selectedPrimarie.Primar}
+                  </p>
+                  <p className="text-sm text-muted-foreground">
+                    <span className="font-semibold text-foreground">Șef SVSU:</span> {selectedPrimarie["Şef SVSU"]}
+                  </p>
+                  <div className="space-y-2">
+                    {renderCallAction("Sună primar", selectedPrimarie.telefonprimar)}
+                    {renderCallAction("Sună șef SVSU", selectedPrimarie.telefonsvsu)}
+                  </div>
+                  <Button
+                    className="h-12 w-full text-base"
+                    size="lg"
+                    onClick={() => getDirections(selectedPrimarie.coordinates.latitude, selectedPrimarie.coordinates.longitude)}
+                    type="button"
+                  >
+                    <MdDirections size={18} className="mr-2" /> Navighează la primărie
+                  </Button>
+                </div>
+              </>
+            )}
+
+            {mobileSelectionType === "subunitate" && selectedSubunitate && (
+              <>
+                <SheetHeader className="pr-8">
+                  <SheetTitle>{selectedSubunitate.title}</SheetTitle>
+                  <SheetDescription>Subunitate ISU</SheetDescription>
+                </SheetHeader>
+                <div className="mt-4 space-y-3">
+                  <div className="space-y-2">
+                    {renderCallAction("Sună dispecerat GIS", selectedSubunitate.nrGis)}
+                    {renderCallAction("Sună comandant", selectedSubunitate.nrComandant)}
+                  </div>
+                  <Button
+                    className="h-12 w-full text-base"
+                    size="lg"
+                    onClick={() => getDirections(selectedSubunitate.coordinates.latitude, selectedSubunitate.coordinates.longitude)}
+                    type="button"
+                  >
+                    <MdDirections size={18} className="mr-2" /> Navighează la subunitate
+                  </Button>
+                </div>
+              </>
+            )}
+
+            {mobileSelectionType === "seveso" && selectedSeveso && (
+              <>
+                <SheetHeader className="pr-8">
+                  <SheetTitle>{selectedSeveso.title}</SheetTitle>
+                  <SheetDescription>Obiectiv SEVESO</SheetDescription>
+                </SheetHeader>
+                <div className="mt-4 space-y-3">
+                  <p className="text-sm text-muted-foreground">
+                    <span className="font-semibold text-foreground">Adresă:</span> {selectedSeveso.adresa}
+                  </p>
+                  <p className="text-sm text-muted-foreground">
+                    <span className="font-semibold text-foreground">Zone impact:</span> {situatiiSeveso.length}
+                  </p>
+                  <div className="space-y-2 pt-1">
+                    {renderCallAction("Sună obiectiv", selectedSeveso.telefon)}
+                    <Button
+                      className="h-12 w-full text-base"
+                      size="lg"
+                      onClick={() => getDirections(selectedSeveso.coordinates.latitude, selectedSeveso.coordinates.longitude)}
+                      type="button"
+                    >
+                      <MdDirections size={18} className="mr-2" /> Navighează la obiectiv
+                    </Button>
+                    <Button
+                      variant="outline"
+                      className="h-12 w-full text-base"
+                      size="lg"
+                      onClick={() => openSevesoPdf(selectedSeveso.pdfUri)}
+                      type="button"
+                    >
+                      <MdWarning size={18} className="mr-2" /> Deschide planul
+                    </Button>
+                  </div>
+                </div>
+              </>
+            )}
+
+            {mobileSelectionType === "raion" && selectedRaionDetails && (
+              <>
+                <SheetHeader className="pr-8">
+                  <SheetTitle>Raion {selectedRaionDetails.label}</SheetTitle>
+                  <SheetDescription>Zonă de intervenție</SheetDescription>
+                </SheetHeader>
+                <div className="mt-4 space-y-3">
+                  <div className="flex items-center gap-2 text-sm">
+                    <span className="font-semibold">Culoare:</span>
+                    <span
+                      className="h-4 w-4 rounded-full border border-black/10"
+                      style={{ backgroundColor: selectedRaionDetails.color }}
+                      aria-hidden
+                    />
+                    <span className="text-muted-foreground">{selectedRaionDetails.label}</span>
+                  </div>
+                  {selectedRaionDetails.pointsCount > 0 && (
+                    <p className="text-sm text-muted-foreground">
+                      <span className="font-semibold text-foreground">Puncte contur:</span> {selectedRaionDetails.pointsCount}
+                    </p>
+                  )}
+                  <div className="space-y-2 pt-1">
+                    <Button
+                      className="h-12 w-full text-base"
+                      size="lg"
+                      onClick={() => setVisibleRaions([selectedRaionDetails.id])}
+                      type="button"
+                      disabled={isOnlySelectedRaionVisible}
+                    >
+                      <MdVisibility size={18} className="mr-2" />
+                      {isOnlySelectedRaionVisible ? "Raion activ" : "Arată doar acest raion"}
+                    </Button>
+                    <Button
+                      variant="outline"
+                      className="h-12 w-full text-base"
+                      size="lg"
+                      onClick={showAllRaions}
+                      type="button"
+                      disabled={areAllRaionsVisible}
+                    >
+                      <MdLayers size={18} className="mr-2" /> Arată toate raioanele
+                    </Button>
+                    {selectedRaionDetails.center && (
+                      <Button
+                        variant="outline"
+                        className="h-12 w-full text-base"
+                        size="lg"
+                        onClick={() => {
+                          if (!mapRef) return
+                          mapRef.panTo(selectedRaionDetails.center)
+                          mapRef.setZoom(Math.max(mapRef.getZoom() || 11, 11))
+                        }}
+                        type="button"
+                      >
+                        <MdLocationOn size={18} className="mr-2" /> Centrează harta pe raion
+                      </Button>
+                    )}
+                  </div>
+                </div>
+              </>
+            )}
+
+            {mobileSelectionType === "search" && searchedLocationMarker && (
+              <>
+                <SheetHeader className="pr-8">
+                  <SheetTitle>Locație căutată</SheetTitle>
+                  <SheetDescription>{searchedLocationMarker.address || "Adresă necunoscută"}</SheetDescription>
+                </SheetHeader>
+                <div className="mt-4 space-y-3">
+                  <p className="text-sm text-muted-foreground">
+                    <span className="font-semibold text-foreground">Raion:</span> {searchedLocationMarker.raion || "Necunoscut"}
+                  </p>
+                  <Button
+                    className="h-12 w-full text-base"
+                    size="lg"
+                    onClick={() => getDirections(searchedLocationMarker.lat, searchedLocationMarker.lng)}
+                    type="button"
+                  >
+                    <MdDirections size={18} className="mr-2" /> Navighează aici
+                  </Button>
+                  <Button
+                    variant="outline"
+                    className="h-12 w-full text-base"
+                    size="lg"
+                    onClick={() => void findNearestHydrant()}
+                    type="button"
+                    disabled={isFindingNearest}
+                  >
+                    <MdFireHydrantAlt size={18} className="mr-2" />
+                    {isFindingNearest ? "Caut hidrant..." : "Cel mai apropiat hidrant"}
+                  </Button>
+                </div>
+              </>
+            )}
+          </SheetContent>
+        </Sheet>
+      )}
+
       {/* Map controls - desktop version */}
       {!isMobile && (
         <div className="absolute left-4 top-1/2 transform -translate-y-1/2 flex flex-col gap-2">
@@ -1799,6 +2683,7 @@ export function Map({ apiKey = "", hasAccess = false, isAdmin = false }: MapProp
             size="icon"
             className="rounded-full shadow-md"
             onClick={handleGetLocation}
+            title="Locație"
             type="button"
           >
             <MdMyLocation size={20} />
@@ -1829,18 +2714,7 @@ export function Map({ apiKey = "", hasAccess = false, isAdmin = false }: MapProp
             />
           )}
 
-          {userLocation && (
-            <Button
-              variant="secondary"
-              size="icon"
-              className="rounded-full shadow-md bg-blue-500 hover:bg-blue-600 text-white"
-              onClick={findNearestHydrant}
-              title="Cel mai apropiat hidrant"
-              type="button"
-            >
-              <MdFireHydrantAlt size={20} />
-            </Button>
-          )}
+          {nearestHydrantButton}
         </div>
       )}
 
@@ -1849,39 +2723,130 @@ export function Map({ apiKey = "", hasAccess = false, isAdmin = false }: MapProp
         <MobileBottomNav
           onGetLocation={handleGetLocation}
           onFindNearestHydrant={findNearestHydrant}
-          onToggleFullscreen={toggleFullscreen}
+          onStartNewHydrantReport={() => void handleStartNewHydrantReport()}
+          nearestHydrantButton={nearestHydrantMobileButton}
           onToggleMapType={toggleMapType}
           onTogglePolygonControls={togglePolygonControls}
-          userLocation={userLocation}
           mapType={mapType}
-          hasAccess={hasAccess}
-          showHydrants={showHydrants}
-          showPrimarii={showPrimarii}
-          showSubunitati={showSubunitati}
-          showSeveso={showSeveso}
-          showSevesoCircles={showSevesoCircles}
-          toggleHydrants={() => setShowHydrants(!showHydrants)}
-          togglePrimarii={() => setShowPrimarii(!showPrimarii)}
-          toggleSubunitati={() => setShowSubunitati(!showSubunitati)}
-          toggleSeveso={() => setShowSeveso(!showSeveso)}
-          toggleSevesoCircles={() => setShowSevesoCircles(!showSevesoCircles)}
         />
       )}
 
-      {/* Polygon controls */}
-      {showPolygonControls && (
-        <div
-          className={`absolute ${
-            isMobile ? "bottom-16 left-0 right-0 mx-2" : "top-4 right-4"
-          } z-10 bg-white/95 dark:bg-gray-800/95 backdrop-blur-sm rounded-lg shadow-lg`}
-        >
-          <PolygonControls
-            visibleRaions={visibleRaions}
-            toggleRaion={toggleRaion}
-            showAllRaions={showAllRaions}
-            hideAllRaions={hideAllRaions}
-          />
+      {/* Polygon controls (desktop) */}
+      {!isMobile && showPolygonControls && (
+        <div className="absolute top-4 right-4 z-10 bg-white/95 dark:bg-gray-800/95 backdrop-blur-sm rounded-lg shadow-lg">
+          <PolygonControls visibleRaions={visibleRaions} toggleRaion={toggleRaion} showAllRaions={showAllRaions} hideAllRaions={hideAllRaions} />
         </div>
+      )}
+
+      {/* Polygon + marker filters (mobile) */}
+      {isMobile && (
+        <Sheet open={showPolygonControls} onOpenChange={setShowPolygonControls}>
+          <SheetContent
+            side="bottom"
+            className="h-auto max-h-[82vh] overflow-y-auto rounded-t-2xl pb-[calc(env(safe-area-inset-bottom)+5.5rem)]"
+          >
+            <SheetHeader className="space-y-1 pr-8 text-left">
+              <SheetTitle className="text-lg">Filtre hartă</SheetTitle>
+              <SheetDescription>Raioane vizibile și straturi de markeri.</SheetDescription>
+            </SheetHeader>
+
+            {hasAccess ? (
+              <Tabs defaultValue="raioane" className="mt-5 w-full">
+                <TabsList className="grid h-11 w-full grid-cols-2 rounded-xl bg-muted/60 p-1">
+                  <TabsTrigger value="raioane" className="rounded-lg text-sm font-medium">
+                    Raioane
+                  </TabsTrigger>
+                  <TabsTrigger value="markeri" className="rounded-lg text-sm font-medium">
+                    Markeri
+                  </TabsTrigger>
+                </TabsList>
+                <TabsContent value="raioane" className="mt-4 focus-visible:outline-none">
+                  <PolygonControls
+                    layout="sheet"
+                    visibleRaions={visibleRaions}
+                    toggleRaion={toggleRaion}
+                    showAllRaions={showAllRaions}
+                    hideAllRaions={hideAllRaions}
+                  />
+                </TabsContent>
+                <TabsContent value="markeri" className="mt-4 focus-visible:outline-none">
+                  <div className="overflow-hidden rounded-xl border bg-card shadow-sm">
+                    <div className="flex items-center justify-between gap-3 border-b px-4 py-3.5">
+                      <div className="flex min-w-0 items-center gap-3">
+                        <div className="flex h-10 w-10 shrink-0 items-center justify-center rounded-lg bg-blue-500/15">
+                          <MdFireHydrantAlt className="text-blue-600" size={22} />
+                        </div>
+                        <div>
+                          <p className="text-sm font-semibold leading-tight">Hidranți</p>
+                          <p className="text-xs text-muted-foreground">Puncte pe hartă</p>
+                        </div>
+                      </div>
+                      <Switch checked={showHydrants} onCheckedChange={(v) => setShowHydrants(Boolean(v))} />
+                    </div>
+                    <div className="flex items-center justify-between gap-3 border-b px-4 py-3.5">
+                      <div className="flex min-w-0 items-center gap-3">
+                        <div className="flex h-10 w-10 shrink-0 items-center justify-center rounded-lg bg-amber-500/15">
+                          <MdAccountBalance className="text-amber-600" size={22} />
+                        </div>
+                        <div>
+                          <p className="text-sm font-semibold leading-tight">Primării</p>
+                          <p className="text-xs text-muted-foreground">Sedii administrative</p>
+                        </div>
+                      </div>
+                      <Switch checked={showPrimarii} onCheckedChange={(v) => setShowPrimarii(Boolean(v))} />
+                    </div>
+                    <div className="flex items-center justify-between gap-3 border-b px-4 py-3.5">
+                      <div className="flex min-w-0 items-center gap-3">
+                        <div className="flex h-10 w-10 shrink-0 items-center justify-center rounded-lg bg-red-500/15">
+                          <MdFireTruck className="text-red-600" size={22} />
+                        </div>
+                        <div>
+                          <p className="text-sm font-semibold leading-tight">Subunități ISU</p>
+                          <p className="text-xs text-muted-foreground">Stații și detașamente</p>
+                        </div>
+                      </div>
+                      <Switch checked={showSubunitati} onCheckedChange={(v) => setShowSubunitati(Boolean(v))} />
+                    </div>
+                    <div className="flex items-center justify-between gap-3 px-4 py-3.5">
+                      <div className="flex min-w-0 items-center gap-3">
+                        <div className="flex h-10 w-10 shrink-0 items-center justify-center rounded-lg bg-yellow-500/15">
+                          <MdWarning className="text-yellow-600" size={22} />
+                        </div>
+                        <div>
+                          <p className="text-sm font-semibold leading-tight">Obiective SEVESO</p>
+                          <p className="text-xs text-muted-foreground">Instalații reglementate</p>
+                        </div>
+                      </div>
+                      <Switch checked={showSeveso} onCheckedChange={(v) => setShowSeveso(Boolean(v))} />
+                    </div>
+                    {showSeveso && (
+                      <div className="flex items-center justify-between gap-3 border-t bg-muted/30 px-4 py-3 pl-6">
+                        <Label htmlFor="mobile-seveso-zones" className="text-sm font-medium leading-tight">
+                          Zone de impact (cercuri)
+                        </Label>
+                        <Switch
+                          id="mobile-seveso-zones"
+                          checked={showSevesoCircles}
+                          onCheckedChange={(v) => setShowSevesoCircles(Boolean(v))}
+                        />
+                      </div>
+                    )}
+                  </div>
+                </TabsContent>
+              </Tabs>
+            ) : (
+              <div className="mt-5">
+                <PolygonControls
+                  layout="sheet"
+                  visibleRaions={visibleRaions}
+                  toggleRaion={toggleRaion}
+                  showAllRaions={showAllRaions}
+                  hideAllRaions={hideAllRaions}
+                />
+              </div>
+            )}
+          </SheetContent>
+        </Sheet>
       )}
 
       {/* SEVESO situation dialog */}
@@ -1899,16 +2864,12 @@ export function Map({ apiKey = "", hasAccess = false, isAdmin = false }: MapProp
         />
       )}
 
-      {reportDialogOpen && (
-        <HydrantReportDialog
-          isOpen={reportDialogOpen}
-          onClose={() => setReportDialogOpen(false)}
-          coordinates={reportLocation}
-          existingHydrant={reportHydrant}
-          userId={user?.uid || ""}
-          userEmail={user?.email || ""}
-        />
-      )}
+      <HydrantReportDialog
+        isOpen={reportDialogOpen}
+        onClose={() => setReportDialogOpen(false)}
+        coordinates={reportLocation}
+        existingHydrant={reportHydrant}
+      />
     </div>
   )
 }
