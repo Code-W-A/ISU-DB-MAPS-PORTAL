@@ -1,5 +1,6 @@
 import { render, screen, fireEvent } from "@testing-library/react"
 import { FilterPopup } from "@/components/filter-popup"
+import { DEFAULT_HYDRANT_ATTRIBUTE_FILTERS } from "@/lib/hydrant-attribute-filters"
 
 describe("FilterPopup", () => {
   const defaultProps = {
@@ -8,6 +9,8 @@ describe("FilterPopup", () => {
     showSubunitati: true,
     showSeveso: true,
     showSevesoCircles: true,
+    hydrantAttrFilters: DEFAULT_HYDRANT_ATTRIBUTE_FILTERS,
+    onHydrantAttrFiltersChange: jest.fn(),
     toggleHydrants: jest.fn(),
     togglePrimarii: jest.fn(),
     toggleSubunitati: jest.fn(),

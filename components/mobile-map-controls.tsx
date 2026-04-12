@@ -5,6 +5,8 @@ import { Button } from "@/components/ui/button"
 import { MdMyLocation, MdFireHydrantAlt, MdFullscreen, MdMap, MdSatellite, MdLayers, MdTerrain } from "react-icons/md"
 import { MobileFilterPopup } from "@/components/mobile-filter-popup"
 import { useMobile } from "@/hooks/use-mobile"
+import type { HydrantAttributeFilters } from "@/lib/hydrant-attribute-filters"
+import { DEFAULT_HYDRANT_ATTRIBUTE_FILTERS } from "@/lib/hydrant-attribute-filters"
 
 interface MobileMapControlsProps {
   onGetLocation: () => void
@@ -25,6 +27,8 @@ interface MobileMapControlsProps {
   toggleSubunitati: () => void
   toggleSeveso: () => void
   toggleSevesoCircles: () => void
+  hydrantAttrFilters?: HydrantAttributeFilters
+  onHydrantAttrFiltersChange?: (next: HydrantAttributeFilters) => void
 }
 
 function MobileMapControlsComponent({
@@ -46,6 +50,8 @@ function MobileMapControlsComponent({
   toggleSubunitati,
   toggleSeveso,
   toggleSevesoCircles,
+  hydrantAttrFilters = DEFAULT_HYDRANT_ATTRIBUTE_FILTERS,
+  onHydrantAttrFiltersChange = () => {},
 }: MobileMapControlsProps) {
   const { orientation } = useMobile()
 
@@ -101,6 +107,8 @@ function MobileMapControlsComponent({
           showSubunitati={showSubunitati}
           showSeveso={showSeveso}
           showSevesoCircles={showSevesoCircles}
+          hydrantAttrFilters={hydrantAttrFilters}
+          onHydrantAttrFiltersChange={onHydrantAttrFiltersChange}
           toggleHydrants={toggleHydrants}
           togglePrimarii={togglePrimarii}
           toggleSubunitati={toggleSubunitati}

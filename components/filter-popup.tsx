@@ -7,6 +7,8 @@ import { Label } from "@/components/ui/label"
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card"
 import { MdFilterList, MdFireHydrantAlt, MdAccountBalance, MdFireTruck, MdWarning, MdClose } from "react-icons/md"
 import { Switch } from "@/components/ui/switch"
+import type { HydrantAttributeFilters } from "@/lib/hydrant-attribute-filters"
+import { HydrantAttributeFilterControls } from "@/components/hydrant-attribute-filter-controls"
 
 interface FilterPopupProps {
   showHydrants: boolean
@@ -14,6 +16,8 @@ interface FilterPopupProps {
   showSubunitati: boolean
   showSeveso: boolean
   showSevesoCircles?: boolean
+  hydrantAttrFilters: HydrantAttributeFilters
+  onHydrantAttrFiltersChange: (next: HydrantAttributeFilters) => void
   toggleHydrants: () => void
   togglePrimarii: () => void
   toggleSubunitati: () => void
@@ -27,6 +31,8 @@ export function FilterPopup({
   showSubunitati,
   showSeveso,
   showSevesoCircles,
+  hydrantAttrFilters,
+  onHydrantAttrFiltersChange,
   toggleHydrants,
   togglePrimarii,
   toggleSubunitati,
@@ -48,7 +54,7 @@ export function FilterPopup({
       </Button>
 
       {isOpen && (
-        <Card className="absolute top-12 left-0 z-50 w-64 shadow-lg">
+        <Card className="absolute top-12 left-0 z-50 w-72 max-h-[min(70vh,28rem)] overflow-y-auto shadow-lg">
           <CardHeader className="p-3 pb-0 flex flex-row justify-between items-center">
             <CardTitle className="text-sm">Filtrează markeri</CardTitle>
             <Button variant="ghost" size="icon" className="h-6 w-6" onClick={() => setIsOpen(false)}>
@@ -65,6 +71,14 @@ export function FilterPopup({
                 </Label>
               </div>
             </div>
+
+            {showHydrants && (
+              <HydrantAttributeFilterControls
+                filters={hydrantAttrFilters}
+                onChange={onHydrantAttrFiltersChange}
+                variant="checkbox"
+              />
+            )}
 
             <div className="flex items-center space-x-2">
               <Checkbox id="show-primarii" checked={showPrimarii} onCheckedChange={togglePrimarii} />

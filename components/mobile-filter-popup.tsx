@@ -7,6 +7,9 @@ import { Label } from "@/components/ui/label"
 import { Sheet, SheetContent, SheetHeader, SheetTitle } from "@/components/ui/sheet"
 import { MdFilterList, MdFireHydrantAlt, MdAccountBalance, MdFireTruck, MdWarning } from "react-icons/md"
 import { Switch } from "@/components/ui/switch"
+import type { HydrantAttributeFilters } from "@/lib/hydrant-attribute-filters"
+import { DEFAULT_HYDRANT_ATTRIBUTE_FILTERS } from "@/lib/hydrant-attribute-filters"
+import { HydrantAttributeFilterControls } from "@/components/hydrant-attribute-filter-controls"
 
 interface MobileFilterPopupProps {
   showHydrants: boolean
@@ -14,6 +17,8 @@ interface MobileFilterPopupProps {
   showSubunitati: boolean
   showSeveso: boolean
   showSevesoCircles?: boolean
+  hydrantAttrFilters?: HydrantAttributeFilters
+  onHydrantAttrFiltersChange?: (next: HydrantAttributeFilters) => void
   toggleHydrants: () => void
   togglePrimarii: () => void
   toggleSubunitati: () => void
@@ -27,6 +32,8 @@ export function MobileFilterPopup({
   showSubunitati,
   showSeveso,
   showSevesoCircles,
+  hydrantAttrFilters = DEFAULT_HYDRANT_ATTRIBUTE_FILTERS,
+  onHydrantAttrFiltersChange = () => {},
   toggleHydrants,
   togglePrimarii,
   toggleSubunitati,
@@ -68,6 +75,15 @@ export function MobileFilterPopup({
                 </Label>
               </div>
             </div>
+
+            {showHydrants && (
+              <HydrantAttributeFilterControls
+                filters={hydrantAttrFilters}
+                onChange={onHydrantAttrFiltersChange}
+                variant="checkbox"
+                className="pl-1"
+              />
+            )}
 
             <div className="flex items-center space-x-3 touch-target">
               <Checkbox

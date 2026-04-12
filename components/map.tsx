@@ -61,6 +61,14 @@ import { renderToStaticMarkup } from "react-dom/server"
 import { HydrantReportDialog } from "@/components/hydrant-report-dialog"
 import { useAuth } from "@/components/auth-provider"
 import { readMapLayerCache, writeMapLayerCache } from "@/lib/offline-db"
+import {
+  readStoredHydrantAttributeFilters,
+  writeStoredHydrantAttributeFilters,
+  DEFAULT_HYDRANT_ATTRIBUTE_FILTERS,
+  hydrantMatchesAttributeFilters,
+  type HydrantAttributeFilters,
+} from "@/lib/hydrant-attribute-filters"
+import { HydrantAttributeFilterControls } from "@/components/hydrant-attribute-filter-controls"
 
 // Declare google variable
 declare global {
@@ -339,6 +347,9 @@ export function Map({ apiKey = "", hasAccess = false, isAdmin = false }: MapProp
   const [showPolygonControls, setShowPolygonControls] = useState(false)
   const [loadingPolygons, setLoadingPolygons] = useState(true)
   const [showSevesoCircles, setShowSevesoCircles] = useState(true)
+  const [hydrantAttrFilters, setHydrantAttrFilters] = useState<HydrantAttributeFilters>(() =>
+    typeof window !== "undefined" ? readStoredHydrantAttributeFilters() : DEFAULT_HYDRANT_ATTRIBUTE_FILTERS,
+  )
   const [situatiiSeveso, setSituatiiSeveso] = useState<SituatieSeveso[]>([])
   const [activeSituatii, setActiveSituatii] = useState<string[]>([])
   const [isEditingSituatie, setIsEditingSituatie] = useState(false)
@@ -370,6 +381,10 @@ export function Map({ apiKey = "", hasAccess = false, isAdmin = false }: MapProp
   })
 
   const { user } = useAuth()
+
+  useEffect(() => {
+    writeStoredHydrantAttributeFilters(hydrantAttrFilters)
+  }, [hydrantAttrFilters])
 
   const updateLayerLastSync = useCallback((layer: keyof LayerSyncState, timestamp: number | null) => {
     setLayerLastSync((previousState) => ({
@@ -408,6 +423,11 @@ export function Map({ apiKey = "", hasAccess = false, isAdmin = false }: MapProp
         return acc
       }, []),
     [hydrants],
+  )
+
+  const hydrantPointsFiltered = useMemo(
+    () => hydrantPoints.filter((p) => hydrantMatchesAttributeFilters(p.hydrant, hydrantAttrFilters)),
+    [hydrantPoints, hydrantAttrFilters],
   )
 
   const selectedHydrantDistance = useMemo(() => {
@@ -548,7 +568,7 @@ export function Map({ apiKey = "", hasAccess = false, isAdmin = false }: MapProp
 
   // Update visible hydrants based on map bounds and zoom - with throttling
   useEffect(() => {
-    if (!mapBounds || hydrantPoints.length === 0 || !isLoaded) return
+    if (!mapBounds || hydrantPointsFiltered.length === 0 || !isLoaded) return
 
     // Clear any existing timeout to prevent multiple updates
     if (boundsChangeTimeoutRef.current) {
@@ -567,7 +587,7 @@ export function Map({ apiKey = "", hasAccess = false, isAdmin = false }: MapProp
 
         const isLngInBounds = (lng: number) => (west <= east ? lng >= west && lng <= east : lng >= west || lng <= east)
 
-        const inBoundsHydrants = hydrantPoints.filter(
+        const inBoundsHydrants = hydrantPointsFiltered.filter(
           (hydrantPoint) => hydrantPoint.lat <= north && hydrantPoint.lat >= south && isLngInBounds(hydrantPoint.lng),
         )
 
@@ -602,7 +622,7 @@ export function Map({ apiKey = "", hasAccess = false, isAdmin = false }: MapProp
         clearTimeout(boundsChangeTimeoutRef.current)
       }
     }
-  }, [hydrantPoints, mapBounds, zoom, isMobile, isLoaded, isLowEndDevice])
+  }, [hydrantPointsFiltered, mapBounds, zoom, isMobile, isLoaded, isLowEndDevice])
 
   // Load primarii data with caching
   useEffect(() => {
@@ -1281,10 +1301,13 @@ export function Map({ apiKey = "", hasAccess = false, isAdmin = false }: MapProp
   // Find nearest hydrant
   const findNearestHydrant = useCallback(async () => {
     if (isFindingNearest) return
-    if (hydrantPoints.length === 0) {
+    if (hydrantPointsFiltered.length === 0) {
       toast({
-        title: "Date indisponibile",
-        description: "Lista de hidranți nu este încărcată încă.",
+        title: "Niciun hidrant de afișat",
+        description:
+          hydrantPoints.length === 0
+            ? "Lista de hidranți nu este încărcată încă."
+            : "Ajustează filtrele (stare / tip) sau activează mai multe categorii.",
         variant: "destructive",
       })
       return
@@ -1300,7 +1323,7 @@ export function Map({ apiKey = "", hasAccess = false, isAdmin = false }: MapProp
         setUserLocation(currentLocation)
       }
 
-      for (const hydrantPoint of hydrantPoints) {
+      for (const hydrantPoint of hydrantPointsFiltered) {
         const distance = haversineDistanceKm(currentLocation, {
           lat: hydrantPoint.lat,
           lng: hydrantPoint.lng,
@@ -1315,7 +1338,7 @@ export function Map({ apiKey = "", hasAccess = false, isAdmin = false }: MapProp
       if (!nearestHydrantPoint) {
         toast({
           title: "Hidrant negăsit",
-          description: "Nu am putut identifica un hidrant apropiat.",
+          description: "Niciun hidrant nu corespunde filtrelor curente sau nu există în zonă.",
           variant: "destructive",
         })
         return
@@ -1339,7 +1362,7 @@ export function Map({ apiKey = "", hasAccess = false, isAdmin = false }: MapProp
     } finally {
       setIsFindingNearest(false)
     }
-  }, [hydrantPoints, isFindingNearest, mapRef, requestCurrentLocation, userLocation])
+  }, [hydrantPoints, hydrantPointsFiltered, isFindingNearest, mapRef, requestCurrentLocation, userLocation])
 
   const findNearestHydrantLabel = isFindingNearest ? "Caut..." : "Cel mai apropiat hidrant"
 
@@ -2706,6 +2729,8 @@ export function Map({ apiKey = "", hasAccess = false, isAdmin = false }: MapProp
               showSubunitati={showSubunitati}
               showSeveso={showSeveso}
               showSevesoCircles={showSevesoCircles}
+              hydrantAttrFilters={hydrantAttrFilters}
+              onHydrantAttrFiltersChange={setHydrantAttrFilters}
               toggleHydrants={() => setShowHydrants(!showHydrants)}
               togglePrimarii={() => setShowPrimarii(!showPrimarii)}
               toggleSubunitati={() => setShowSubunitati(!showSubunitati)}
@@ -2783,6 +2808,11 @@ export function Map({ apiKey = "", hasAccess = false, isAdmin = false }: MapProp
                       </div>
                       <Switch checked={showHydrants} onCheckedChange={(v) => setShowHydrants(Boolean(v))} />
                     </div>
+                    {showHydrants && (
+                      <div className="border-b px-4 py-3">
+                        <HydrantAttributeFilterControls filters={hydrantAttrFilters} onChange={setHydrantAttrFilters} variant="switch" />
+                      </div>
+                    )}
                     <div className="flex items-center justify-between gap-3 border-b px-4 py-3.5">
                       <div className="flex min-w-0 items-center gap-3">
                         <div className="flex h-10 w-10 shrink-0 items-center justify-center rounded-lg bg-amber-500/15">
@@ -2835,7 +2865,7 @@ export function Map({ apiKey = "", hasAccess = false, isAdmin = false }: MapProp
                 </TabsContent>
               </Tabs>
             ) : (
-              <div className="mt-5">
+              <div className="mt-5 space-y-5">
                 <PolygonControls
                   layout="sheet"
                   visibleRaions={visibleRaions}
@@ -2843,6 +2873,10 @@ export function Map({ apiKey = "", hasAccess = false, isAdmin = false }: MapProp
                   showAllRaions={showAllRaions}
                   hideAllRaions={hideAllRaions}
                 />
+                <div>
+                  <p className="mb-2 text-sm font-semibold">Hidranți pe hartă</p>
+                  <HydrantAttributeFilterControls filters={hydrantAttrFilters} onChange={setHydrantAttrFilters} variant="switch" />
+                </div>
               </div>
             )}
           </SheetContent>
