@@ -1,6 +1,7 @@
 "use client"
 
 import { useEffect, useState } from "react"
+import Link from "next/link"
 import { useRouter } from "next/navigation"
 import { useAuth } from "@/components/auth-provider"
 import { UserRoleTable } from "@/components/dashboard/user-role-table"
@@ -27,7 +28,9 @@ import {
 import { getAllUsers } from "@/lib/role-service"
 import type { UserRole } from "@/types/user-role"
 import { LegislatieTab } from "@/components/dashboard/legislatie-tab"
+import { PreventionZonesPanel } from "@/components/dashboard/prevention-zones-panel"
 import { hasFullAccess } from "@/lib/role-service"
+import { MdMap } from "react-icons/md"
 
 export default function DashboardPage() {
   const { user, loading } = useAuth()
@@ -48,7 +51,17 @@ export default function DashboardPage() {
         // Verificăm dacă utilizatorul este administratorul principal
         if (user.email === "radu.p1995@yahoo.com") {
           // Admin principal are acces la toate taburile
-          setAllowedTabs(["users", "hydrants", "reports", "primarii", "seveso", "data", "settings", "legislatie"])
+          setAllowedTabs([
+            "users",
+            "hydrants",
+            "reports",
+            "primarii",
+            "seveso",
+            "data",
+            "settings",
+            "legislatie",
+            "preventionZones",
+          ])
           
           // Încărcăm lista de utilizatori pentru tabul de utilizatori
           try {
@@ -183,6 +196,15 @@ export default function DashboardPage() {
                 <span>Legislație</span>
               </TabsTrigger>
             )}
+            {allowedTabs.includes("preventionZones") && (
+              <TabsTrigger
+                value="preventionZones"
+                className="flex items-center justify-start md:justify-center gap-2 text-sm px-3 py-2 w-full md:w-auto"
+              >
+                <MdMap className="h-4 w-4" />
+                <span>Zone competență</span>
+              </TabsTrigger>
+            )}
           </TabsList>
         </div>
 
@@ -284,6 +306,27 @@ export default function DashboardPage() {
         {allowedTabs.includes("legislatie") && (
           <TabsContent value="legislatie" className="space-y-6">
             <LegislatieTab />
+          </TabsContent>
+        )}
+
+        {allowedTabs.includes("preventionZones") && (
+          <TabsContent value="preventionZones" className="space-y-6">
+            <Card>
+              <CardHeader>
+                <CardTitle>Zone de competență (prevenție)</CardTitle>
+                <CardDescription>
+                  Poligoane pentru acoperire inspectori; vizibile pe hartă pentru conturile cu acces citire sau editare.
+                  Pentru desen pe hartă întreagă, deschideți pagina{" "}
+                  <Link href="/prevenire" className="font-medium text-primary underline underline-offset-2">
+                    Prevenire
+                  </Link>
+                  .
+                </CardDescription>
+              </CardHeader>
+              <CardContent>
+                <PreventionZonesPanel allUsers={users} />
+              </CardContent>
+            </Card>
           </TabsContent>
         )}
       </Tabs>

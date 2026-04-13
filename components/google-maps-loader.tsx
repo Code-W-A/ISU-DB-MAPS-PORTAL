@@ -1,23 +1,36 @@
 "use client"
 
 import React, { useState, useEffect, useRef } from "react"
+import Link from "next/link"
 import { Skeleton } from "@/components/ui/skeleton"
 import { Button } from "@/components/ui/button"
 import Image from "next/image"
-import { MdLogout, MdDashboard } from "react-icons/md"
+import { MdLogout, MdDashboard, MdMap, MdHealthAndSafety } from "react-icons/md"
 import { useMobile } from "@/hooks/use-mobile"
 import { MobileHeader } from "@/components/mobile-header"
 import { MapLocationSearchBar } from "@/components/map-location-search-bridge"
 import { useRouter } from "next/navigation"
+import { cn } from "@/lib/utils"
 
 interface GoogleMapsLoaderProps {
   children: React.ReactNode
   onSignOut: () => void
   userEmail: string
   isAdmin?: boolean
+  /** Pagina dedicată prevenție: titlu și link către harta generală. */
+  variant?: "default" | "prevention"
+  /** Pe harta generală: link către `/prevenire` pentru utilizatori cu acces la zone competență. */
+  showPreventionFullMapLink?: boolean
 }
 
-export function GoogleMapsLoader({ children, onSignOut, userEmail, isAdmin = false }: GoogleMapsLoaderProps) {
+export function GoogleMapsLoader({
+  children,
+  onSignOut,
+  userEmail,
+  isAdmin = false,
+  variant = "default",
+  showPreventionFullMapLink = false,
+}: GoogleMapsLoaderProps) {
   const [apiKey, setApiKey] = useState<string | null>(null)
   const [isLoading, setIsLoading] = useState(true)
   const [error, setError] = useState<string | null>(null)
@@ -140,6 +153,8 @@ export function GoogleMapsLoader({ children, onSignOut, userEmail, isAdmin = fal
     router.push("/dashboard")
   }
 
+  const isPrevention = variant === "prevention"
+
   const renderChildren = () => {
     if (!React.isValidElement(children)) {
       return children
@@ -156,7 +171,7 @@ export function GoogleMapsLoader({ children, onSignOut, userEmail, isAdmin = fal
             <div className="relative w-10 h-10">
               <Image src="/images/isu-logo.png" alt="ISU DB MAPS Logo" fill className="object-contain" />
             </div>
-            <h1 className="text-2xl font-bold">{isMobile ? "ISU Maps" : "ISU DB MAPS"}</h1>
+            <h1 className="text-2xl font-bold">{isPrevention ? "Prevenire" : isMobile ? "ISU Maps" : "ISU DB MAPS"}</h1>
           </div>
           {!isMobile && (
             <div className="flex items-center gap-4">
@@ -169,7 +184,7 @@ export function GoogleMapsLoader({ children, onSignOut, userEmail, isAdmin = fal
           )}
         </div>
         <div className="flex flex-col items-center justify-center h-[calc(100vh-120px)]">
-          <h2 className="text-xl font-bold mb-4">Se încarcă harta...</h2>
+          <h2 className="text-xl font-bold mb-4">{isPrevention ? "Se încarcă harta de prevenire..." : "Se încarcă harta..."}</h2>
           <Skeleton className="w-full h-[calc(100vh-200px)]" />
         </div>
       </div>
@@ -184,7 +199,7 @@ export function GoogleMapsLoader({ children, onSignOut, userEmail, isAdmin = fal
             <div className="relative w-10 h-10">
               <Image src="/images/isu-logo.png" alt="ISU DB MAPS Logo" fill className="object-contain" />
             </div>
-            <h1 className="text-2xl font-bold">{isMobile ? "ISU Maps" : "ISU DB MAPS"}</h1>
+            <h1 className="text-2xl font-bold">{isPrevention ? "Prevenire" : isMobile ? "ISU Maps" : "ISU DB MAPS"}</h1>
           </div>
           {!isMobile && (
             <div className="flex items-center gap-4">
@@ -209,7 +224,7 @@ export function GoogleMapsLoader({ children, onSignOut, userEmail, isAdmin = fal
 
   // Only render children (which will include the map) when we have the API key
   return (
-    <div className="flex flex-col h-screen">
+    <div className={cn("flex min-h-0 flex-col", isPrevention ? "h-[100dvh]" : "h-screen")}>
       {!isOnline && (
         <div className="bg-amber-100 text-amber-900 text-center text-sm py-2 px-3 border-b border-amber-300">
           Mod offline activ. Se folosesc datele disponibile din cache.
@@ -222,6 +237,8 @@ export function GoogleMapsLoader({ children, onSignOut, userEmail, isAdmin = fal
             onSignOut={onSignOut}
             isAdmin={isAdmin}
             onNavigateToDashboard={handleNavigateToDashboard}
+            variant={variant}
+            showPreventionFullMapLink={showPreventionFullMapLink}
           />
           <div className="flex-1 relative min-h-0">{renderChildren()}</div>
         </>
@@ -232,13 +249,34 @@ export function GoogleMapsLoader({ children, onSignOut, userEmail, isAdmin = fal
               <div className="relative w-10 h-10">
                 <Image src="/images/isu-logo.png" alt="ISU DB MAPS Logo" fill className="object-contain" />
               </div>
-              <h1 className="text-2xl font-bold whitespace-nowrap">ISU DB MAPS</h1>
+              <div className="flex flex-col leading-tight">
+                <h1 className="text-2xl font-bold whitespace-nowrap">{isPrevention ? "Prevenire" : "ISU DB MAPS"}</h1>
+                {isPrevention && (
+                  <span className="text-xs font-medium text-muted-foreground">Zone competență</span>
+                )}
+              </div>
             </div>
             <div className="flex justify-center min-w-0 px-2">
               <MapLocationSearchBar className="max-w-xl" />
             </div>
             <div className="flex items-center justify-end gap-2 sm:gap-4 shrink-0">
               <span className="hidden lg:inline text-sm text-muted-foreground truncate max-w-[12rem]">Conectat ca {userEmail}</span>
+              {isPrevention && (
+                <Button variant="outline" size="sm" asChild type="button">
+                  <Link href="/">
+                    <MdMap size={16} className="mr-2" />
+                    Hartă generală
+                  </Link>
+                </Button>
+              )}
+              {!isPrevention && showPreventionFullMapLink && (
+                <Button variant="outline" size="sm" asChild type="button">
+                  <Link href="/prevenire">
+                    <MdHealthAndSafety size={16} className="mr-2" />
+                    Prevenire
+                  </Link>
+                </Button>
+              )}
               {isAdmin && (
                 <Button variant="outline" size="sm" onClick={handleNavigateToDashboard} type="button">
                   <MdDashboard size={16} className="mr-2" />

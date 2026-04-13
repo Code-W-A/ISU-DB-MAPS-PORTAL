@@ -9,9 +9,10 @@ import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "@
 import { toast } from "@/components/ui/use-toast"
 import { MdDelete, MdAdd } from "react-icons/md"
 import type { UserRole } from "@/types/user-role"
-import { addUserWithFullAccess, removeUserAccess, checkEmailExists } from "@/lib/role-service"
+import type { PreventionZonesAccessLevel } from "@/types/prevention-zone"
+import { addUserWithFullAccess, removeUserAccess, checkEmailExists, mergeUserRoleFields } from "@/lib/role-service"
 import { useAuth } from "@/components/auth-provider"
-import { Select } from "@/components/ui/select"
+import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select"
 
 interface UserRoleTableProps {
   initialUsers: UserRole[]
@@ -26,6 +27,13 @@ const ALL_TABS = [
   { value: "data", label: "Import Date" },
   { value: "settings", label: "Setări" },
   { value: "legislatie", label: "Legislație" },
+  { value: "preventionZones", label: "Zone competență" },
+]
+
+const PREVENTION_ACCESS_OPTIONS: { value: PreventionZonesAccessLevel; label: string }[] = [
+  { value: "none", label: "Fără acces" },
+  { value: "read", label: "Doar citire (hartă + căutare)" },
+  { value: "write", label: "Citire + editare zone" },
 ]
 
 export function UserRoleTable({ initialUsers }: UserRoleTableProps) {
@@ -33,6 +41,7 @@ export function UserRoleTable({ initialUsers }: UserRoleTableProps) {
   const [users, setUsers] = useState<UserRole[]>(initialUsers)
   const [newUserEmail, setNewUserEmail] = useState("")
   const [newUserTabs, setNewUserTabs] = useState<string[]>([])
+  const [newUserPreventionAccess, setNewUserPreventionAccess] = useState<PreventionZonesAccessLevel>("none")
   const [isLoading, setIsLoading] = useState(false)
   const [updatingUser, setUpdatingUser] = useState<string | null>(null)
 
@@ -73,7 +82,13 @@ export function UserRoleTable({ initialUsers }: UserRoleTableProps) {
 
       const tempUid = newUserEmail
 
-      const success = await addUserWithFullAccess(tempUid, newUserEmail, user?.email || "admin", newUserTabs)
+      const success = await addUserWithFullAccess(
+        tempUid,
+        newUserEmail,
+        user?.email || "admin",
+        newUserTabs,
+        newUserPreventionAccess,
+      )
 
       if (success) {
         const newUser: UserRole = {
@@ -83,11 +98,13 @@ export function UserRoleTable({ initialUsers }: UserRoleTableProps) {
           addedBy: user?.email || "admin",
           addedAt: Date.now(),
           allowedTabs: newUserTabs,
+          preventionZonesAccess: newUserPreventionAccess,
         }
 
         setUsers([...users, newUser])
         setNewUserEmail("")
         setNewUserTabs([])
+        setNewUserPreventionAccess("none")
 
         toast({
           title: "Succes",
@@ -145,27 +162,52 @@ export function UserRoleTable({ initialUsers }: UserRoleTableProps) {
   }
 
   const handleTabsChange = async (uid: string, allowedTabs: string[]) => {
-    setUsers(users.map(u => u.uid === uid ? { ...u, allowedTabs } : u))
+    setUsers(users.map((u) => (u.uid === uid ? { ...u, allowedTabs } : u)))
     setUpdatingUser(uid)
-    
+
     try {
-      const userEmail = users.find(u => u.uid === uid)?.email || uid
-      await addUserWithFullAccess(uid, userEmail, user?.email || "admin", allowedTabs)
-      
-      toast({ 
-        title: "Succes",
-        description: "Permisiunile au fost actualizate"
-      })
-    } catch (error) {
-      const originalUser = users.find(u => u.uid === uid)
-      if (originalUser) {
-        setUsers(users.map(u => u.uid === uid ? originalUser : u))
+      const ok = await mergeUserRoleFields(uid, { allowedTabs })
+      if (ok) {
+        toast({
+          title: "Succes",
+          description: "Permisiunile au fost actualizate",
+        })
+      } else {
+        throw new Error("merge failed")
       }
-      
-      toast({ 
-        title: "Eroare", 
+    } catch {
+      const originalUser = users.find((u) => u.uid === uid)
+      if (originalUser) {
+        setUsers(users.map((u) => (u.uid === uid ? originalUser : u)))
+      }
+
+      toast({
+        title: "Eroare",
         description: "Nu s-au putut actualiza permisiunile",
-        variant: "destructive" 
+        variant: "destructive",
+      })
+    } finally {
+      setUpdatingUser(null)
+    }
+  }
+
+  const handlePreventionAccessChange = async (uid: string, preventionZonesAccess: PreventionZonesAccessLevel) => {
+    const prev = users.find((u) => u.uid === uid)
+    setUsers(users.map((u) => (u.uid === uid ? { ...u, preventionZonesAccess } : u)))
+    setUpdatingUser(uid)
+    try {
+      const ok = await mergeUserRoleFields(uid, { preventionZonesAccess })
+      if (ok) {
+        toast({ title: "Succes", description: "Acces zone competență actualizat" })
+      } else {
+        throw new Error("merge failed")
+      }
+    } catch {
+      if (prev) setUsers(users.map((u) => (u.uid === uid ? prev : u)))
+      toast({
+        title: "Eroare",
+        description: "Nu s-a putut actualiza accesul la zone",
+        variant: "destructive",
       })
     } finally {
       setUpdatingUser(null)
@@ -186,7 +228,26 @@ export function UserRoleTable({ initialUsers }: UserRoleTableProps) {
         />
           </div>
           
-          <div className="flex-2">
+          <div className="flex-2 space-y-3">
+            <div>
+              <p className="text-sm font-medium mb-2">Zone competență (prevenție):</p>
+              <Select
+                value={newUserPreventionAccess}
+                onValueChange={(v) => setNewUserPreventionAccess(v as PreventionZonesAccessLevel)}
+                disabled={isLoading}
+              >
+                <SelectTrigger className="w-full max-w-md">
+                  <SelectValue placeholder="Acces" />
+                </SelectTrigger>
+                <SelectContent>
+                  {PREVENTION_ACCESS_OPTIONS.map((o) => (
+                    <SelectItem key={o.value} value={o.value}>
+                      {o.label}
+                    </SelectItem>
+                  ))}
+                </SelectContent>
+              </Select>
+            </div>
             <p className="text-sm font-medium mb-2">Selectează taburile permise:</p>
             <div className="grid grid-cols-2 md:grid-cols-4 gap-2">
               {ALL_TABS.map(tab => (
@@ -224,13 +285,14 @@ export function UserRoleTable({ initialUsers }: UserRoleTableProps) {
               <TableHead>Adăugat de</TableHead>
               <TableHead>Data adăugării</TableHead>
               <TableHead>Taburi permise</TableHead>
+              <TableHead className="min-w-[200px]">Zone competență</TableHead>
               {user?.email === "radu.p1995@yahoo.com" && <TableHead className="w-[100px]">Acțiuni</TableHead>}
             </TableRow>
           </TableHeader>
           <TableBody>
             {users.length === 0 ? (
               <TableRow>
-                <TableCell colSpan={user?.email === "radu.p1995@yahoo.com" ? 5 : 4} className="text-center py-4 text-muted-foreground">
+                <TableCell colSpan={user?.email === "radu.p1995@yahoo.com" ? 6 : 5} className="text-center py-4 text-muted-foreground">
                   Nu există utilizatori cu acces la dashboard
                 </TableCell>
               </TableRow>
@@ -281,6 +343,31 @@ export function UserRoleTable({ initialUsers }: UserRoleTableProps) {
                           <span className="text-xs text-gray-500 italic">Niciun tab permis</span>
                         )}
                       </div>
+                    )}
+                  </TableCell>
+                  <TableCell>
+                    {user?.email === "radu.p1995@yahoo.com" ? (
+                      <Select
+                        value={u.preventionZonesAccess ?? "none"}
+                        onValueChange={(v) => void handlePreventionAccessChange(u.uid, v as PreventionZonesAccessLevel)}
+                        disabled={updatingUser === u.uid}
+                      >
+                        <SelectTrigger className="h-9 w-[min(100%,220px)]">
+                          <SelectValue />
+                        </SelectTrigger>
+                        <SelectContent>
+                          {PREVENTION_ACCESS_OPTIONS.map((o) => (
+                            <SelectItem key={o.value} value={o.value}>
+                              {o.label}
+                            </SelectItem>
+                          ))}
+                        </SelectContent>
+                      </Select>
+                    ) : (
+                      <span className="text-xs text-muted-foreground">
+                        {PREVENTION_ACCESS_OPTIONS.find((o) => o.value === (u.preventionZonesAccess ?? "none"))?.label ??
+                          "Fără acces"}
+                      </span>
                     )}
                   </TableCell>
                   {user?.email === "radu.p1995@yahoo.com" && (

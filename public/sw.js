@@ -1,4 +1,4 @@
-const CACHE_VERSION = "v3"
+const CACHE_VERSION = "v4"
 const APP_SHELL_CACHE = `isu-maps-shell-${CACHE_VERSION}`
 const RUNTIME_CACHE = `isu-maps-runtime-${CACHE_VERSION}`
 const DATA_CACHE = `isu-maps-data-${CACHE_VERSION}`
@@ -27,10 +27,21 @@ function isMapDataRequest(url) {
   return isGitHubRawMapData || isHostedMapSnapshot || isFirebaseStorageSnapshot
 }
 
+/**
+ * Salvează răspunsul în Cache Storage.
+ * Clonarea trebuie făcută sincron, înainte de orice await — altfel clientul poate
+ * începe să citească același Response și clone() aruncă „body is already used”.
+ */
 async function cachePut(cacheName, request, response) {
   if (!response || response.status !== 200) return
+  let responseForCache
+  try {
+    responseForCache = response.clone()
+  } catch {
+    return
+  }
   const cache = await caches.open(cacheName)
-  await cache.put(request, response.clone())
+  await cache.put(request, responseForCache)
 }
 
 async function networkFirst(request, cacheName) {

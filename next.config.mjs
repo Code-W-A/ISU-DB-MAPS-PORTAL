@@ -9,7 +9,7 @@ const nextConfig = {
     ignoreBuildErrors: true,
   },
   images: {
-    domains: ['hebbkx1anhila5yf.public.blob.vercel-storage.com'],
+    domains: ['hebbkx1anhila5yf.public.blob.vercel-storage.com', 'firerescue.ro', 'www.firerescue.ro'],
     unoptimized: true,
   },
   webpack: (config, { buildId, dev, isServer, defaultLoaders, webpack }) => {

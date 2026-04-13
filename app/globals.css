@@ -206,3 +206,23 @@
     background-position: 40px 40px;
   }
 }
+
+/* HTML injectat din WordPress (firerescue) — imagini/tabele responsive */
+.firerescue-wp-html {
+  overflow-x: auto;
+}
+.firerescue-wp-html img,
+.firerescue-wp-html video,
+.firerescue-wp-html iframe {
+  max-width: 100%;
+  height: auto;
+}
+.firerescue-wp-html table {
+  display: block;
+  max-width: 100%;
+  overflow-x: auto;
+}
+.firerescue-wp-html a {
+  text-decoration: underline;
+  text-underline-offset: 2px;
+}

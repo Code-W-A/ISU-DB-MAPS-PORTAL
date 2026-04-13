@@ -60,6 +60,9 @@ import { useMobile } from "@/hooks/use-mobile"
 import { renderToStaticMarkup } from "react-dom/server"
 import { HydrantReportDialog } from "@/components/hydrant-report-dialog"
 import { useAuth } from "@/components/auth-provider"
+import { getPreventionZonesAccessForAuthUser } from "@/lib/role-service"
+import { subscribePreventionZones, findPreventionZonesForPoint } from "@/lib/prevention-zone-service"
+import type { PreventionZone, PreventionZoneMatch } from "@/types/prevention-zone"
 import { readMapLayerCache, writeMapLayerCache } from "@/lib/offline-db"
 import {
   readStoredHydrantAttributeFilters,
@@ -364,7 +367,11 @@ export function Map({ apiKey = "", hasAccess = false, isAdmin = false }: MapProp
     address: string
     raion: string | null
     showTooltip: boolean
+    preventionMatches?: PreventionZoneMatch[]
   } | null>(null)
+  const [preventionZonesAccess, setPreventionZonesAccess] = useState<"none" | "read" | "write">("none")
+  const [preventionZones, setPreventionZones] = useState<PreventionZone[]>([])
+  const [showPreventionZonesLayer, setShowPreventionZonesLayer] = useState(true)
   const [allSituatiiSeveso, setAllSituatiiSeveso] = useState<SituatieSeveso[]>([])
   const mapContainerRef = useRef<HTMLDivElement>(null)
 
@@ -381,6 +388,32 @@ export function Map({ apiKey = "", hasAccess = false, isAdmin = false }: MapProp
   })
 
   const { user } = useAuth()
+
+  useEffect(() => {
+    if (!user) {
+      setPreventionZonesAccess("none")
+      return
+    }
+    void getPreventionZonesAccessForAuthUser({ uid: user.uid, email: user.email }).then(setPreventionZonesAccess)
+  }, [user])
+
+  useEffect(() => {
+    if (preventionZonesAccess === "none") {
+      setPreventionZones([])
+      return
+    }
+    const unsub = subscribePreventionZones(setPreventionZones)
+    return () => unsub()
+  }, [preventionZonesAccess])
+
+  const preventionLayerControl = useMemo(
+    () => ({
+      available: preventionZonesAccess !== "none",
+      visible: showPreventionZonesLayer,
+      onToggle: () => setShowPreventionZonesLayer((v) => !v),
+    }),
+    [preventionZonesAccess, showPreventionZonesLayer],
+  )
 
   useEffect(() => {
     writeStoredHydrantAttributeFilters(hydrantAttrFilters)
@@ -1140,6 +1173,15 @@ export function Map({ apiKey = "", hasAccess = false, isAdmin = false }: MapProp
         address: place.formatted_address || place.name || "",
         raion,
         showTooltip: true,
+        ...(preventionZonesAccess !== "none" && user
+          ? {
+              preventionMatches: findPreventionZonesForPoint(
+                preventionZones,
+                { lat, lng },
+                { uid: user.uid, email: user.email },
+              ),
+            }
+          : {}),
       })
 
       setSelectedRaion(null)
@@ -1147,7 +1189,7 @@ export function Map({ apiKey = "", hasAccess = false, isAdmin = false }: MapProp
       // Clear the clickedLocation if it exists
       setClickedLocation(null)
     },
-    [polygonData, mapRef],
+    [polygonData, mapRef, preventionZones, preventionZonesAccess, user],
   )
 
   const { registerMapLocationSelectHandler, setMapsScriptReady } = useMapLocationSearchBridge()
@@ -1845,6 +1887,24 @@ export function Map({ apiKey = "", hasAccess = false, isAdmin = false }: MapProp
               )
             })}
 
+          {preventionZonesAccess !== "none" &&
+            showPreventionZonesLayer &&
+            preventionZones.map((zone) => (
+              <Polygon
+                key={`prevention-zone-${zone.id}`}
+                paths={zone.path}
+                options={{
+                  fillColor: "#7c3aed",
+                  fillOpacity: 0.14,
+                  strokeColor: "#5b21b6",
+                  strokeOpacity: 0.9,
+                  strokeWeight: 2,
+                  zIndex: 2,
+                  clickable: false,
+                }}
+              />
+            ))}
+
           {/* Subunitate markers */}
           {mapRef &&
             subunitateIcon &&
@@ -2039,6 +2099,27 @@ export function Map({ apiKey = "", hasAccess = false, isAdmin = false }: MapProp
                       <div>
                         <span className="font-semibold">Raion:</span> {searchedLocationMarker.raion || "Necunoscut"}
                       </div>
+                      {searchedLocationMarker.preventionMatches !== undefined && (
+                        <div className="text-sm">
+                          <span className="font-semibold">Zonă competență:</span>{" "}
+                          {searchedLocationMarker.preventionMatches.length === 0 ? (
+                            <span className="text-muted-foreground">În afara zonelor definite</span>
+                          ) : (
+                            <ul className="mt-1 list-disc pl-4 space-y-0.5">
+                              {searchedLocationMarker.preventionMatches.map((m) => (
+                                <li key={m.zoneId}>
+                                  {m.zoneName}
+                                  {m.isOwnZone ? (
+                                    <span className="text-violet-700 dark:text-violet-300"> — zona ta</span>
+                                  ) : (
+                                    <span className="text-muted-foreground"> — inspector: {m.inspectorLabel}</span>
+                                  )}
+                                </li>
+                              ))}
+                            </ul>
+                          )}
+                        </div>
+                      )}
                       <div>
                         <span className="font-semibold">Coordonate:</span> {searchedLocationMarker.lat.toFixed(6)},{" "}
                         {searchedLocationMarker.lng.toFixed(6)}
@@ -2650,6 +2731,23 @@ export function Map({ apiKey = "", hasAccess = false, isAdmin = false }: MapProp
                   <p className="text-sm text-muted-foreground">
                     <span className="font-semibold text-foreground">Raion:</span> {searchedLocationMarker.raion || "Necunoscut"}
                   </p>
+                  {searchedLocationMarker.preventionMatches !== undefined && (
+                    <div className="text-sm text-muted-foreground">
+                      <span className="font-semibold text-foreground">Zonă competență:</span>{" "}
+                      {searchedLocationMarker.preventionMatches.length === 0 ? (
+                        "În afara zonelor definite"
+                      ) : (
+                        <ul className="mt-1 list-disc pl-4 text-foreground space-y-1">
+                          {searchedLocationMarker.preventionMatches.map((m) => (
+                            <li key={m.zoneId}>
+                              {m.zoneName}
+                              {m.isOwnZone ? " — zona ta" : ` — inspector: ${m.inspectorLabel}`}
+                            </li>
+                          ))}
+                        </ul>
+                      )}
+                    </div>
+                  )}
                   <Button
                     className="h-12 w-full text-base"
                     size="lg"
@@ -2759,7 +2857,13 @@ export function Map({ apiKey = "", hasAccess = false, isAdmin = false }: MapProp
       {/* Polygon controls (desktop) */}
       {!isMobile && showPolygonControls && (
         <div className="absolute top-4 right-4 z-10 bg-white/95 dark:bg-gray-800/95 backdrop-blur-sm rounded-lg shadow-lg">
-          <PolygonControls visibleRaions={visibleRaions} toggleRaion={toggleRaion} showAllRaions={showAllRaions} hideAllRaions={hideAllRaions} />
+          <PolygonControls
+            visibleRaions={visibleRaions}
+            toggleRaion={toggleRaion}
+            showAllRaions={showAllRaions}
+            hideAllRaions={hideAllRaions}
+            preventionLayer={preventionLayerControl}
+          />
         </div>
       )}
 
@@ -2792,6 +2896,7 @@ export function Map({ apiKey = "", hasAccess = false, isAdmin = false }: MapProp
                     toggleRaion={toggleRaion}
                     showAllRaions={showAllRaions}
                     hideAllRaions={hideAllRaions}
+                    preventionLayer={preventionLayerControl}
                   />
                 </TabsContent>
                 <TabsContent value="markeri" className="mt-4 focus-visible:outline-none">
@@ -2872,6 +2977,7 @@ export function Map({ apiKey = "", hasAccess = false, isAdmin = false }: MapProp
                   toggleRaion={toggleRaion}
                   showAllRaions={showAllRaions}
                   hideAllRaions={hideAllRaions}
+                  preventionLayer={preventionLayerControl}
                 />
                 <div>
                   <p className="mb-2 text-sm font-semibold">Hidranți pe hartă</p>

@@ -2,7 +2,7 @@
 
 import { useState, useEffect } from "react"
 import { useAuth } from "@/components/auth-provider"
-import { hasFullAccess, getAllUsers } from "@/lib/role-service"
+import { hasFullAccess, getAllUsers, getPreventionZonesAccessForAuthUser } from "@/lib/role-service"
 import { Map } from "@/components/map"
 import { GoogleMapsLoader } from "@/components/google-maps-loader"
 import { MapLocationSearchProvider } from "@/components/map-location-search-bridge"
@@ -14,6 +14,7 @@ export function MapContainer() {
   const [hasAccess, setHasAccess] = useState(false)
   const [isAdmin, setIsAdmin] = useState(false)
   const [hasDashboardAccess, setHasDashboardAccess] = useState(false)
+  const [preventionZonesAccess, setPreventionZonesAccess] = useState<"none" | "read" | "write">("none")
   const [logoutDialogOpen, setLogoutDialogOpen] = useState(false)
   const router = useRouter()
 
@@ -53,6 +54,14 @@ export function MapContainer() {
     checkAccess()
   }, [user])
 
+  useEffect(() => {
+    if (!user) {
+      setPreventionZonesAccess("none")
+      return
+    }
+    void getPreventionZonesAccessForAuthUser({ uid: user.uid, email: user.email }).then(setPreventionZonesAccess)
+  }, [user])
+
   const handleSignOutRequest = () => setLogoutDialogOpen(true)
 
   const handleNavigateToDashboard = () => {
@@ -61,7 +70,12 @@ export function MapContainer() {
 
   return (
     <MapLocationSearchProvider>
-      <GoogleMapsLoader onSignOut={handleSignOutRequest} userEmail={user?.email || ""} isAdmin={hasDashboardAccess}>
+      <GoogleMapsLoader
+        onSignOut={handleSignOutRequest}
+        userEmail={user?.email || ""}
+        isAdmin={hasDashboardAccess}
+        showPreventionFullMapLink={preventionZonesAccess !== "none"}
+      >
         <Map hasAccess={hasAccess} isAdmin={isAdmin} />
       </GoogleMapsLoader>
       <LogoutConfirmDialog open={logoutDialogOpen} onOpenChange={setLogoutDialogOpen} />

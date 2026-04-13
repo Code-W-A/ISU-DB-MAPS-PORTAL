@@ -3,6 +3,7 @@
 import { Button } from "@/components/ui/button"
 import { Checkbox } from "@/components/ui/checkbox"
 import { Label } from "@/components/ui/label"
+import { Switch } from "@/components/ui/switch"
 import { availableRaions, raionColors } from "@/lib/polygon-service"
 import { raionNameMapping } from "@/lib/geo-utils"
 import { cn } from "@/lib/utils"
@@ -15,6 +16,12 @@ interface PolygonControlsProps {
   className?: string
   /** sheet: grile tip chip pentru mobil / bottom sheet */
   layout?: "default" | "sheet"
+  /** Strat opțional: zone competență (prevenție) */
+  preventionLayer?: {
+    available: boolean
+    visible: boolean
+    onToggle: () => void
+  }
 }
 
 export function PolygonControls({
@@ -24,6 +31,7 @@ export function PolygonControls({
   hideAllRaions,
   className,
   layout = "default",
+  preventionLayer,
 }: PolygonControlsProps) {
   if (layout === "sheet") {
     return (
@@ -58,6 +66,15 @@ export function PolygonControls({
             )
           })}
         </div>
+        {preventionLayer?.available && (
+          <div className="flex items-center justify-between gap-3 rounded-xl border border-border/80 bg-muted/30 px-3 py-3">
+            <div>
+              <p className="text-sm font-medium leading-tight">Zone competență</p>
+              <p className="text-xs text-muted-foreground">Prevenție (inspector)</p>
+            </div>
+            <Switch checked={preventionLayer.visible} onCheckedChange={() => preventionLayer.onToggle()} />
+          </div>
+        )}
       </div>
     )
   }
@@ -88,6 +105,20 @@ export function PolygonControls({
           </div>
         ))}
       </div>
+      {preventionLayer?.available && (
+        <div className="mt-4 border-t border-border pt-3 space-y-2">
+          <div className="flex items-center justify-between gap-2">
+            <Label htmlFor="toggle-prevention-zones" className="text-sm font-medium">
+              Zone competență (prevenție)
+            </Label>
+            <Switch
+              id="toggle-prevention-zones"
+              checked={preventionLayer.visible}
+              onCheckedChange={() => preventionLayer.onToggle()}
+            />
+          </div>
+        </div>
+      )}
     </div>
   )
 }
