@@ -53,10 +53,25 @@
   * {
     @apply border-border;
   }
+  html {
+    overscroll-behavior: none;
+  }
   body {
     @apply bg-background text-foreground;
     overscroll-behavior: none;
   }
+}
+
+/* Rute cu hartă fullscreen: fără scroll pe document → reduce pull-to-refresh / rubber-band la trageri verticale pe hartă (mobil) */
+html:has(.map-shell) {
+  height: 100%;
+  overscroll-behavior: none;
+}
+
+html:has(.map-shell) body {
+  height: 100%;
+  overflow: hidden;
+  overscroll-behavior: none;
 }
 
 /* Fix for Google Maps interactions */
@@ -66,7 +81,8 @@
 
 /* Ensure the map container doesn't block interactions */
 #map-container {
-  touch-action: manipulation !important;
+  touch-action: pan-x pan-y pinch-zoom !important;
+  overscroll-behavior: none;
   height: 100%;
   width: 100%;
 }

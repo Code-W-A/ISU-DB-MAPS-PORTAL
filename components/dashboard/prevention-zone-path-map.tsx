@@ -262,7 +262,9 @@ function PreventionZonePathMapInner({
   if (isFullscreen) {
     return (
       <div className="flex min-h-0 min-w-0 flex-1 flex-col">
-        <div className="min-h-0 min-w-0 flex-1 overflow-hidden">{mapBlock}</div>
+        <div className="min-h-0 min-w-0 flex-1 overflow-hidden overscroll-none [touch-action:pan-x_pan-y_pinch-zoom]">
+          {mapBlock}
+        </div>
       </div>
     )
   }

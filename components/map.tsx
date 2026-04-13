@@ -1838,7 +1838,11 @@ export function Map({ apiKey = "", hasAccess = false, isAdmin = false }: MapProp
   }
 
   return (
-    <div className="flex-1 relative h-full min-h-0 w-full" id="map-container" ref={mapContainerRef}>
+    <div
+      className="flex-1 relative h-full min-h-0 w-full overscroll-none [touch-action:pan-x_pan-y_pinch-zoom]"
+      id="map-container"
+      ref={mapContainerRef}
+    >
       {isLoaded && window.google && (
         <GoogleMap
           mapContainerStyle={mapContainerStyle}

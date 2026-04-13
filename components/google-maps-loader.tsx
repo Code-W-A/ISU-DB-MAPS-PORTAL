@@ -165,7 +165,7 @@ export function GoogleMapsLoader({
 
   if (isLoading) {
     return (
-      <div className="p-4">
+      <div className="map-shell flex min-h-screen flex-col p-4">
         <div className="flex justify-between items-center mb-4">
           <div className="flex items-center gap-3">
             <div className="relative w-10 h-10">
@@ -193,7 +193,7 @@ export function GoogleMapsLoader({
 
   if (error) {
     return (
-      <div className="p-4">
+      <div className="map-shell flex min-h-screen flex-col p-4">
         <div className="flex justify-between items-center mb-4">
           <div className="flex items-center gap-3">
             <div className="relative w-10 h-10">
@@ -224,7 +224,12 @@ export function GoogleMapsLoader({
 
   // Only render children (which will include the map) when we have the API key
   return (
-    <div className={cn("flex min-h-0 flex-col", isPrevention ? "h-[100dvh]" : "h-screen")}>
+    <div
+      className={cn(
+        "map-shell flex min-h-0 flex-col",
+        isPrevention ? "h-[100dvh]" : "h-screen",
+      )}
+    >
       {!isOnline && (
         <div className="bg-amber-100 text-amber-900 text-center text-sm py-2 px-3 border-b border-amber-300">
           Mod offline activ. Se folosesc datele disponibile din cache.
