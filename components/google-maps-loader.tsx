@@ -21,6 +21,9 @@ interface GoogleMapsLoaderProps {
   variant?: "default" | "prevention"
   /** Pe harta generală: link către `/prevenire` pentru utilizatori cu acces la zone competență. */
   showPreventionFullMapLink?: boolean
+  /** Din coloana „Taburi permise” (allowedTabs: indrumator / adr). */
+  showIndrumatorLink?: boolean
+  showAdrLink?: boolean
 }
 
 export function GoogleMapsLoader({
@@ -30,7 +33,10 @@ export function GoogleMapsLoader({
   isAdmin = false,
   variant = "default",
   showPreventionFullMapLink = false,
+  showIndrumatorLink = false,
+  showAdrLink = false,
 }: GoogleMapsLoaderProps) {
+  const hasMapToolLinks = showIndrumatorLink || showAdrLink
   const [apiKey, setApiKey] = useState<string | null>(null)
   const [isLoading, setIsLoading] = useState(true)
   const [error, setError] = useState<string | null>(null)
@@ -244,12 +250,19 @@ export function GoogleMapsLoader({
             onNavigateToDashboard={handleNavigateToDashboard}
             variant={variant}
             showPreventionFullMapLink={showPreventionFullMapLink}
+            showIndrumatorLink={showIndrumatorLink}
+            showAdrLink={showAdrLink}
           />
           <div className="flex-1 relative min-h-0">{renderChildren()}</div>
         </>
       ) : (
         <>
-          <div className="grid grid-cols-[auto_minmax(0,1fr)_auto] gap-3 items-center p-4 border-b relative z-30">
+          <div
+            className={cn(
+              "grid gap-3 items-center p-4 border-b relative z-30",
+              hasMapToolLinks ? "grid-cols-[auto_auto_minmax(0,1fr)_auto]" : "grid-cols-[auto_minmax(0,1fr)_auto]",
+            )}
+          >
             <div className="flex items-center gap-3 shrink-0">
               <div className="relative w-10 h-10">
                 <Image src="/images/isu-logo.png" alt="ISU DB MAPS Logo" fill className="object-contain" />
@@ -261,6 +274,20 @@ export function GoogleMapsLoader({
                 )}
               </div>
             </div>
+            {hasMapToolLinks && (
+              <div className="flex flex-col justify-center gap-1.5 border-l pl-3 min-w-0 shrink-0 max-w-[9rem]">
+                {showIndrumatorLink && (
+                  <Button variant="outline" size="sm" className="h-8 w-full justify-center px-2 text-xs" asChild type="button">
+                    <Link href="/indrumator">Îndrumător</Link>
+                  </Button>
+                )}
+                {showAdrLink && (
+                  <Button variant="outline" size="sm" className="h-8 w-full justify-center px-2 text-xs" asChild type="button">
+                    <Link href="/adr">ADR</Link>
+                  </Button>
+                )}
+              </div>
+            )}
             <div className="flex justify-center min-w-0 px-2">
               <MapLocationSearchBar className="max-w-xl" />
             </div>

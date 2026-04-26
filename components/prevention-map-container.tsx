@@ -9,6 +9,7 @@ import { MapLocationSearchProvider } from "@/components/map-location-search-brid
 import { PreventionFullPageMap } from "@/components/prevention-full-page-map"
 import { Button } from "@/components/ui/button"
 import { getAllUsers, getPreventionZonesAccessForAuthUser, hasFullAccess } from "@/lib/role-service"
+import { getMapToolLinkFlags } from "@/lib/map-tool-links"
 import type { UserRole } from "@/types/user-role"
 
 export function PreventionMapContainer() {
@@ -16,6 +17,7 @@ export function PreventionMapContainer() {
   const [access, setAccess] = useState<"none" | "read" | "write">("none")
   const [allUsers, setAllUsers] = useState<UserRole[]>([])
   const [hasDashboardAccess, setHasDashboardAccess] = useState(false)
+  const [mapToolLinks, setMapToolLinks] = useState({ showIndrumatorLink: false, showAdrLink: false })
   const [logoutDialogOpen, setLogoutDialogOpen] = useState(false)
 
   useEffect(() => {
@@ -52,6 +54,27 @@ export function PreventionMapContainer() {
     }
     void checkDashboard()
   }, [user])
+
+  useEffect(() => {
+    if (!user || access === "none") {
+      setMapToolLinks({ showIndrumatorLink: false, showAdrLink: false })
+      return
+    }
+    const loadToolLinks = async () => {
+      if (user.email === "radu.p1995@yahoo.com") {
+        setMapToolLinks(getMapToolLinkFlags({ email: user.email, allowedTabs: undefined }))
+        return
+      }
+      try {
+        const list = await getAllUsers()
+        const current = list.find((u) => u.email === user.email || u.uid === user.uid)
+        setMapToolLinks(getMapToolLinkFlags({ email: user.email, allowedTabs: current?.allowedTabs }))
+      } catch {
+        setMapToolLinks({ showIndrumatorLink: false, showAdrLink: false })
+      }
+    }
+    void loadToolLinks()
+  }, [user, access])
 
   useEffect(() => {
     if (!user || access === "none") {
@@ -99,6 +122,8 @@ export function PreventionMapContainer() {
         onSignOut={handleSignOutRequest}
         userEmail={user?.email || ""}
         isAdmin={hasDashboardAccess}
+        showIndrumatorLink={mapToolLinks.showIndrumatorLink}
+        showAdrLink={mapToolLinks.showAdrLink}
       >
         <PreventionFullPageMap access={access} allUsers={allUsers} />
       </GoogleMapsLoader>

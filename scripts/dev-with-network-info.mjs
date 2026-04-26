@@ -34,23 +34,40 @@ const scheme = useHttps ? "https" : "http"
 const port = process.env.PORT || "3000"
 const ips = getLanIpv4Addresses()
 
+/** Link clicabil în terminale (OSC 8): Cursor, VS Code, iTerm2, WezTerm, etc. — Cmd/Ctrl+click */
+function terminalLink(url) {
+  if (process.env.NO_HYPERLINK || process.env.CI || process.env.TERM === "dumb") {
+    return url
+  }
+  return `\u001B]8;;${url}\u001B\\${url}\u001B]8;;\u001B\\`
+}
+
+const localUrl = `${scheme}://localhost:${port}`
+
 console.log("")
-console.log("━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━")
-console.log("  Telefon (același Wi‑Fi) — deschide în browser:")
+console.log("╔═══════════════════════════════════════════════════════╗")
+console.log("║  Google Chrome (acest computer) — adresa de deschis:  ║")
+console.log("╚═══════════════════════════════════════════════════════╝")
+console.log("")
+console.log(`  ${terminalLink(localUrl)}`)
+console.log("")
+console.log("  (Cmd+click / Ctrl+click pe adresa de deasupra = deschide în browser, dacă terminalul o suportă.)")
+console.log("")
+console.log("──────────────────────────────────────────────────────")
+console.log("  Telefon / alt dispozitiv (același Wi‑Fi):")
 if (ips.length === 0) {
-  console.log("  (nu am găsit IP automat — Setări → Rețea → Wi‑Fi → Detalii)")
+  console.log("  (nu am găsit IP — pe Mac: System Settings → Network → IP)")
 } else {
   for (const ip of ips) {
-    console.log(`  → ${scheme}://${ip}:${port}`)
+    const u = `${scheme}://${ip}:${port}`
+    console.log(`  ${terminalLink(u)}`)
   }
 }
 if (useHttps) {
   console.log("")
-  console.log("  Geolocație pe telefon: HTTPS e necesar — acceptă certificatul „nesigur” (e normal la dev).")
+  console.log("  Notă: pe telefon, acceptă certificatul de dezvoltare (HTTPS).")
 }
-console.log("")
-console.log(`  Mac (acest calculator): ${scheme}://localhost:${port}`)
-console.log("━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━")
+console.log("──────────────────────────────────────────────────────")
 console.log("")
 
 const nextArgs = ["dev", "-H", "0.0.0.0"]

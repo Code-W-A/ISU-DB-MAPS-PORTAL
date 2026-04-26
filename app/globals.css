@@ -74,25 +74,20 @@ html:has(.map-shell) body {
   overscroll-behavior: none;
 }
 
-/* Fix for Google Maps interactions */
-.gm-style {
-  touch-action: pan-x pan-y !important;
+/* Google Maps: fără pan-x/pan-y restrictiv; none = twist/rotate merge la API */
+.gm-style,
+.gm-style > div {
+  touch-action: none !important;
 }
 
-/* Ensure the map container doesn't block interactions */
 #map-container {
-  touch-action: pan-x pan-y pinch-zoom !important;
+  touch-action: none !important;
   overscroll-behavior: none;
   height: 100%;
   width: 100%;
 }
 
-/* Fix for mobile devices */
 @media (pointer: coarse) {
-  .gm-style > div {
-    touch-action: pan-x pan-y !important;
-  }
-
   /* Ensure controls don't block map interactions */
   .map-controls {
     pointer-events: auto !important;

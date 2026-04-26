@@ -503,8 +503,7 @@ export function Map({ apiKey = "", hasAccess = false, isAdmin = false }: MapProp
       clickableIcons: false,
       disableDefaultUI: isMobile,
       mapTypeId: mapType,
-      // Optimize for low-end devices
-      tilt: isLowEndDevice ? 0 : 45,
+      tilt: isMobile || isLowEndDevice ? 0 : 45,
       maxZoom: isLowEndDevice ? 18 : 20,
     }),
     [isMobile, mapType, isLowEndDevice],
@@ -1839,7 +1838,7 @@ export function Map({ apiKey = "", hasAccess = false, isAdmin = false }: MapProp
 
   return (
     <div
-      className="flex-1 relative h-full min-h-0 w-full overscroll-none [touch-action:pan-x_pan-y_pinch-zoom]"
+      className="flex-1 relative h-full min-h-0 w-full overscroll-none"
       id="map-container"
       ref={mapContainerRef}
     >

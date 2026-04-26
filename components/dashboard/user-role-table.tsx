@@ -2,7 +2,7 @@
 
 import type React from "react"
 
-import { useState } from "react"
+import { useState, useEffect } from "react"
 import { Button } from "@/components/ui/button"
 import { Input } from "@/components/ui/input"
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "@/components/ui/table"
@@ -13,6 +13,8 @@ import type { PreventionZonesAccessLevel } from "@/types/prevention-zone"
 import { addUserWithFullAccess, removeUserAccess, checkEmailExists, mergeUserRoleFields } from "@/lib/role-service"
 import { useAuth } from "@/components/auth-provider"
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select"
+import { Dialog, DialogContent, DialogDescription, DialogHeader, DialogTitle } from "@/components/ui/dialog"
+import { useMobile } from "@/hooks/use-mobile"
 
 interface UserRoleTableProps {
   initialUsers: UserRole[]
@@ -28,6 +30,8 @@ const ALL_TABS = [
   { value: "settings", label: "Setări" },
   { value: "legislatie", label: "Legislație" },
   { value: "preventionZones", label: "Zone competență" },
+  { value: "indrumator", label: "Îndrumător (hartă)" },
+  { value: "adr", label: "ADR / Substanțe periculoase" },
 ]
 
 const PREVENTION_ACCESS_OPTIONS: { value: PreventionZonesAccessLevel; label: string }[] = [
@@ -38,12 +42,24 @@ const PREVENTION_ACCESS_OPTIONS: { value: PreventionZonesAccessLevel; label: str
 
 export function UserRoleTable({ initialUsers }: UserRoleTableProps) {
   const { user } = useAuth()
+  const { isMobile } = useMobile()
   const [users, setUsers] = useState<UserRole[]>(initialUsers)
   const [newUserEmail, setNewUserEmail] = useState("")
   const [newUserTabs, setNewUserTabs] = useState<string[]>([])
   const [newUserPreventionAccess, setNewUserPreventionAccess] = useState<PreventionZonesAccessLevel>("none")
   const [isLoading, setIsLoading] = useState(false)
   const [updatingUser, setUpdatingUser] = useState<string | null>(null)
+  const [openTabsForUid, setOpenTabsForUid] = useState<string | null>(null)
+  const [openZonesForUid, setOpenZonesForUid] = useState<string | null>(null)
+
+  const isTableAdmin = user?.email === "radu.p1995@yahoo.com"
+
+  useEffect(() => {
+    if (!isMobile) {
+      setOpenTabsForUid(null)
+      setOpenZonesForUid(null)
+    }
+  }, [isMobile])
 
   const handleAddUser = async (e: React.FormEvent) => {
     e.preventDefault()
@@ -216,7 +232,7 @@ export function UserRoleTable({ initialUsers }: UserRoleTableProps) {
 
   return (
     <div className="space-y-4">
-      {user?.email === "radu.p1995@yahoo.com" && (
+      {isTableAdmin && (
         <form onSubmit={handleAddUser} className="flex flex-col md:flex-row items-start gap-4 p-4 border rounded-lg bg-gray-50">
           <div className="flex-1">
         <Input
@@ -286,13 +302,13 @@ export function UserRoleTable({ initialUsers }: UserRoleTableProps) {
               <TableHead>Data adăugării</TableHead>
               <TableHead>Taburi permise</TableHead>
               <TableHead className="min-w-[200px]">Zone competență</TableHead>
-              {user?.email === "radu.p1995@yahoo.com" && <TableHead className="w-[100px]">Acțiuni</TableHead>}
+              {isTableAdmin && <TableHead className="w-[100px]">Acțiuni</TableHead>}
             </TableRow>
           </TableHeader>
           <TableBody>
             {users.length === 0 ? (
               <TableRow>
-                <TableCell colSpan={user?.email === "radu.p1995@yahoo.com" ? 6 : 5} className="text-center py-4 text-muted-foreground">
+                <TableCell colSpan={isTableAdmin ? 6 : 5} className="text-center py-4 text-muted-foreground">
                   Nu există utilizatori cu acces la dashboard
                 </TableCell>
               </TableRow>
@@ -303,34 +319,51 @@ export function UserRoleTable({ initialUsers }: UserRoleTableProps) {
                   <TableCell className="text-sm text-gray-600">{u.addedBy}</TableCell>
                   <TableCell className="text-sm text-gray-600">{new Date(u.addedAt).toLocaleString()}</TableCell>
                   <TableCell>
-                    {user?.email === "radu.p1995@yahoo.com" ? (
-                      <div className="grid grid-cols-2 gap-2 max-w-md">
-                        {ALL_TABS.map(tab => (
-                          <label key={tab.value} className="flex items-center gap-2 text-xs cursor-pointer">
-                            <input
-                              type="checkbox"
-                              checked={u.allowedTabs ? u.allowedTabs.includes(tab.value) : false}
-                              onChange={e => {
-                                const currentTabs = u.allowedTabs || []
-                                let newTabs: string[]
-                                
-                                if (e.target.checked) {
-                                  newTabs = [...currentTabs, tab.value]
-                                } else {
-                                  newTabs = currentTabs.filter(t => t !== tab.value)
-                                }
-                                
-                                handleTabsChange(u.uid, newTabs)
-                              }}
-                              disabled={updatingUser === u.uid}
-                              className="rounded"
-                            />
-                            <span className={updatingUser === u.uid ? "opacity-50" : ""}>
-                              {tab.label}
-                            </span>
-                          </label>
-                        ))}
-                      </div>
+                    {isTableAdmin ? (
+                      <>
+                        <div className="hidden grid-cols-2 gap-2 max-w-md md:grid">
+                          {ALL_TABS.map((tab) => (
+                            <label key={tab.value} className="flex items-center gap-2 text-xs cursor-pointer">
+                              <input
+                                type="checkbox"
+                                checked={u.allowedTabs ? u.allowedTabs.includes(tab.value) : false}
+                                onChange={(e) => {
+                                  const currentTabs = u.allowedTabs || []
+                                  let newTabs: string[]
+
+                                  if (e.target.checked) {
+                                    newTabs = [...currentTabs, tab.value]
+                                  } else {
+                                    newTabs = currentTabs.filter((t) => t !== tab.value)
+                                  }
+
+                                  void handleTabsChange(u.uid, newTabs)
+                                }}
+                                disabled={updatingUser === u.uid}
+                                className="rounded"
+                              />
+                              <span className={updatingUser === u.uid ? "opacity-50" : ""}>{tab.label}</span>
+                            </label>
+                          ))}
+                        </div>
+                        <div className="space-y-2 min-w-0 md:hidden">
+                          <p className="text-xs text-muted-foreground">
+                            {(u.allowedTabs || []).length === 0
+                              ? "Niciun tab"
+                              : `${(u.allowedTabs || []).length} taburi selectate`}
+                          </p>
+                          <Button
+                            type="button"
+                            variant="outline"
+                            size="sm"
+                            className="w-full"
+                            onClick={() => setOpenTabsForUid(u.uid)}
+                            disabled={updatingUser === u.uid}
+                          >
+                            Editează taburi
+                          </Button>
+                        </div>
+                      </>
                     ) : (
                       <div className="flex flex-wrap gap-1">
                         {(u.allowedTabs || []).length > 0 ? (
@@ -346,23 +379,43 @@ export function UserRoleTable({ initialUsers }: UserRoleTableProps) {
                     )}
                   </TableCell>
                   <TableCell>
-                    {user?.email === "radu.p1995@yahoo.com" ? (
-                      <Select
-                        value={u.preventionZonesAccess ?? "none"}
-                        onValueChange={(v) => void handlePreventionAccessChange(u.uid, v as PreventionZonesAccessLevel)}
-                        disabled={updatingUser === u.uid}
-                      >
-                        <SelectTrigger className="h-9 w-[min(100%,220px)]">
-                          <SelectValue />
-                        </SelectTrigger>
-                        <SelectContent>
-                          {PREVENTION_ACCESS_OPTIONS.map((o) => (
-                            <SelectItem key={o.value} value={o.value}>
-                              {o.label}
-                            </SelectItem>
-                          ))}
-                        </SelectContent>
-                      </Select>
+                    {isTableAdmin ? (
+                      <>
+                        <div className="hidden md:block">
+                          <Select
+                            value={u.preventionZonesAccess ?? "none"}
+                            onValueChange={(v) => void handlePreventionAccessChange(u.uid, v as PreventionZonesAccessLevel)}
+                            disabled={updatingUser === u.uid}
+                          >
+                            <SelectTrigger className="h-9 w-[min(100%,220px)]">
+                              <SelectValue />
+                            </SelectTrigger>
+                            <SelectContent>
+                              {PREVENTION_ACCESS_OPTIONS.map((o) => (
+                                <SelectItem key={o.value} value={o.value}>
+                                  {o.label}
+                                </SelectItem>
+                              ))}
+                            </SelectContent>
+                          </Select>
+                        </div>
+                        <div className="space-y-2 min-w-0 md:hidden">
+                          <p className="text-xs text-muted-foreground line-clamp-2">
+                            {PREVENTION_ACCESS_OPTIONS.find((o) => o.value === (u.preventionZonesAccess ?? "none"))?.label ??
+                              "Fără acces"}
+                          </p>
+                          <Button
+                            type="button"
+                            variant="outline"
+                            size="sm"
+                            className="w-full"
+                            onClick={() => setOpenZonesForUid(u.uid)}
+                            disabled={updatingUser === u.uid}
+                          >
+                            Setează acces
+                          </Button>
+                        </div>
+                      </>
                     ) : (
                       <span className="text-xs text-muted-foreground">
                         {PREVENTION_ACCESS_OPTIONS.find((o) => o.value === (u.preventionZonesAccess ?? "none"))?.label ??
@@ -370,7 +423,7 @@ export function UserRoleTable({ initialUsers }: UserRoleTableProps) {
                       </span>
                     )}
                   </TableCell>
-                  {user?.email === "radu.p1995@yahoo.com" && (
+                  {isTableAdmin && (
                     <TableCell>
                       <Button 
                         variant="ghost" 
@@ -388,6 +441,98 @@ export function UserRoleTable({ initialUsers }: UserRoleTableProps) {
           </TableBody>
         </Table>
       </div>
+
+      {isTableAdmin && (
+        <>
+          <Dialog
+            open={openTabsForUid !== null}
+            onOpenChange={(open) => {
+              if (!open) setOpenTabsForUid(null)
+            }}
+          >
+            <DialogContent className="max-w-md">
+              {openTabsForUid
+                ? (() => {
+                    const tabUser = users.find((x) => x.uid === openTabsForUid)
+                    if (!tabUser) return null
+                    return (
+                      <>
+                        <DialogHeader>
+                          <DialogTitle>Taburi permise</DialogTitle>
+                          <DialogDescription className="break-all">{tabUser.email}</DialogDescription>
+                        </DialogHeader>
+                        <div className="grid max-h-[min(60vh,420px)] grid-cols-1 gap-3 overflow-y-auto pr-1 sm:grid-cols-2">
+                          {ALL_TABS.map((tab) => (
+                            <label key={tab.value} className="flex min-h-[44px] items-center gap-2 text-sm cursor-pointer">
+                              <input
+                                type="checkbox"
+                                checked={tabUser.allowedTabs ? tabUser.allowedTabs.includes(tab.value) : false}
+                                onChange={(e) => {
+                                  const currentTabs = tabUser.allowedTabs || []
+                                  const newTabs = e.target.checked
+                                    ? [...currentTabs, tab.value]
+                                    : currentTabs.filter((t) => t !== tab.value)
+                                  void handleTabsChange(tabUser.uid, newTabs)
+                                }}
+                                disabled={updatingUser === tabUser.uid}
+                                className="rounded"
+                              />
+                              <span className={updatingUser === tabUser.uid ? "opacity-50" : ""}>{tab.label}</span>
+                            </label>
+                          ))}
+                        </div>
+                      </>
+                    )
+                  })()
+                : null}
+            </DialogContent>
+          </Dialog>
+
+          <Dialog
+            open={openZonesForUid !== null}
+            onOpenChange={(open) => {
+              if (!open) setOpenZonesForUid(null)
+            }}
+          >
+            <DialogContent className="max-w-md">
+              {openZonesForUid
+                ? (() => {
+                    const zoneUser = users.find((x) => x.uid === openZonesForUid)
+                    if (!zoneUser) return null
+                    return (
+                      <>
+                        <DialogHeader>
+                          <DialogTitle>Zone competență</DialogTitle>
+                          <DialogDescription className="break-all">{zoneUser.email}</DialogDescription>
+                        </DialogHeader>
+                        <Select
+                          value={zoneUser.preventionZonesAccess ?? "none"}
+                          onValueChange={(v) => {
+                            const level = v as PreventionZonesAccessLevel
+                            setOpenZonesForUid(null)
+                            void handlePreventionAccessChange(zoneUser.uid, level)
+                          }}
+                          disabled={updatingUser === zoneUser.uid}
+                        >
+                          <SelectTrigger className="h-11 w-full">
+                            <SelectValue />
+                          </SelectTrigger>
+                          <SelectContent>
+                            {PREVENTION_ACCESS_OPTIONS.map((o) => (
+                              <SelectItem key={o.value} value={o.value}>
+                                {o.label}
+                              </SelectItem>
+                            ))}
+                          </SelectContent>
+                        </Select>
+                      </>
+                    )
+                  })()
+                : null}
+            </DialogContent>
+          </Dialog>
+        </>
+      )}
     </div>
   )
 }
