@@ -8,16 +8,43 @@ import { LogoutConfirmDialog } from "@/components/logout-confirm-dialog"
 import { MapLocationSearchProvider } from "@/components/map-location-search-bridge"
 import { PreventionFullPageMap } from "@/components/prevention-full-page-map"
 import { Button } from "@/components/ui/button"
-import { getAllUsers, getPreventionZonesAccessForAuthUser, hasFullAccess } from "@/lib/role-service"
-import { getMapToolLinkFlags } from "@/lib/map-tool-links"
+import { getAllUsers, getPreventionZonesAccessForAuthUser } from "@/lib/role-service"
+import { useMapAppNavPermissions } from "@/hooks/use-map-app-nav-permissions"
 import type { UserRole } from "@/types/user-role"
+
+function PreventionMapGml({
+  onSignOut,
+  userEmail,
+  access,
+  allUsers,
+}: {
+  onSignOut: () => void
+  userEmail: string
+  access: "read" | "write"
+  allUsers: UserRole[]
+}) {
+  const { user } = useAuth()
+  const nav = useMapAppNavPermissions(user, "preventionOrTool")
+  return (
+    <MapLocationSearchProvider>
+      <GoogleMapsLoader
+        variant="prevention"
+        onSignOut={onSignOut}
+        userEmail={userEmail}
+        isAdmin={nav.hasDashboardAccess}
+        showIndrumatorLink={nav.mapToolLinks.showIndrumatorLink}
+        showAdrLink={nav.mapToolLinks.showAdrLink}
+      >
+        <PreventionFullPageMap access={access} allUsers={allUsers} />
+      </GoogleMapsLoader>
+    </MapLocationSearchProvider>
+  )
+}
 
 export function PreventionMapContainer() {
   const { user } = useAuth()
   const [access, setAccess] = useState<"none" | "read" | "write">("none")
   const [allUsers, setAllUsers] = useState<UserRole[]>([])
-  const [hasDashboardAccess, setHasDashboardAccess] = useState(false)
-  const [mapToolLinks, setMapToolLinks] = useState({ showIndrumatorLink: false, showAdrLink: false })
   const [logoutDialogOpen, setLogoutDialogOpen] = useState(false)
 
   useEffect(() => {
@@ -27,54 +54,6 @@ export function PreventionMapContainer() {
     }
     void getPreventionZonesAccessForAuthUser({ uid: user.uid, email: user.email }).then(setAccess)
   }, [user])
-
-  useEffect(() => {
-    const checkDashboard = async () => {
-      if (!user) {
-        setHasDashboardAccess(false)
-        return
-      }
-      if (user.email === "radu.p1995@yahoo.com") {
-        setHasDashboardAccess(true)
-        return
-      }
-      const fullAccess =
-        (await hasFullAccess(user.uid)) || (user.email ? await hasFullAccess(user.email) : false)
-      if (!fullAccess) {
-        setHasDashboardAccess(false)
-        return
-      }
-      try {
-        const usersList = await getAllUsers()
-        const current = usersList.find((u) => u.email === user.email || u.uid === user.uid)
-        setHasDashboardAccess(Boolean(current?.allowedTabs && current.allowedTabs.length > 0))
-      } catch {
-        setHasDashboardAccess(false)
-      }
-    }
-    void checkDashboard()
-  }, [user])
-
-  useEffect(() => {
-    if (!user || access === "none") {
-      setMapToolLinks({ showIndrumatorLink: false, showAdrLink: false })
-      return
-    }
-    const loadToolLinks = async () => {
-      if (user.email === "radu.p1995@yahoo.com") {
-        setMapToolLinks(getMapToolLinkFlags({ email: user.email, allowedTabs: undefined }))
-        return
-      }
-      try {
-        const list = await getAllUsers()
-        const current = list.find((u) => u.email === user.email || u.uid === user.uid)
-        setMapToolLinks(getMapToolLinkFlags({ email: user.email, allowedTabs: current?.allowedTabs }))
-      } catch {
-        setMapToolLinks({ showIndrumatorLink: false, showAdrLink: false })
-      }
-    }
-    void loadToolLinks()
-  }, [user, access])
 
   useEffect(() => {
     if (!user || access === "none") {
@@ -116,18 +95,14 @@ export function PreventionMapContainer() {
   }
 
   return (
-    <MapLocationSearchProvider>
-      <GoogleMapsLoader
-        variant="prevention"
+    <>
+      <PreventionMapGml
         onSignOut={handleSignOutRequest}
         userEmail={user?.email || ""}
-        isAdmin={hasDashboardAccess}
-        showIndrumatorLink={mapToolLinks.showIndrumatorLink}
-        showAdrLink={mapToolLinks.showAdrLink}
-      >
-        <PreventionFullPageMap access={access} allUsers={allUsers} />
-      </GoogleMapsLoader>
+        access={access}
+        allUsers={allUsers}
+      />
       <LogoutConfirmDialog open={logoutDialogOpen} onOpenChange={setLogoutDialogOpen} />
-    </MapLocationSearchProvider>
+    </>
   )
 }

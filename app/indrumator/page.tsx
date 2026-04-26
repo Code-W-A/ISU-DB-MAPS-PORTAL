@@ -1,4 +1,5 @@
 import type { Metadata } from "next"
+import { ToolEmbedPage } from "@/components/tool-embed-page"
 
 export const metadata: Metadata = {
   title: "Îndrumător",
@@ -7,12 +8,11 @@ export const metadata: Metadata = {
 
 export default function IndrumatorPage() {
   return (
-    <main className="h-screen w-full">
-      <iframe
-        src="/indrumator/index.html"
-        title="Îndrumător SMISU"
-        className="h-full w-full border-0"
-      />
-    </main>
+    <ToolEmbedPage
+      title="Îndrumător"
+      iframeSrc="/indrumator/index.html"
+      iframeTitle="Îndrumător SMISU"
+      tool="indrumator"
+    />
   )
 }

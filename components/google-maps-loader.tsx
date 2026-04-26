@@ -1,13 +1,13 @@
 "use client"
 
 import React, { useState, useEffect, useRef } from "react"
-import Link from "next/link"
 import { Skeleton } from "@/components/ui/skeleton"
 import { Button } from "@/components/ui/button"
 import Image from "next/image"
-import { MdLogout, MdDashboard, MdMap, MdHealthAndSafety } from "react-icons/md"
+import { MdLogout, MdMenu } from "react-icons/md"
 import { useMobile } from "@/hooks/use-mobile"
 import { MobileHeader } from "@/components/mobile-header"
+import { MapAppNavSheet } from "@/components/map-app-nav"
 import { MapLocationSearchBar } from "@/components/map-location-search-bridge"
 import { useRouter } from "next/navigation"
 import { cn } from "@/lib/utils"
@@ -36,7 +36,7 @@ export function GoogleMapsLoader({
   showIndrumatorLink = false,
   showAdrLink = false,
 }: GoogleMapsLoaderProps) {
-  const hasMapToolLinks = showIndrumatorLink || showAdrLink
+  const [desktopNavOpen, setDesktopNavOpen] = useState(false)
   const [apiKey, setApiKey] = useState<string | null>(null)
   const [isLoading, setIsLoading] = useState(true)
   const [error, setError] = useState<string | null>(null)
@@ -257,71 +257,57 @@ export function GoogleMapsLoader({
         </>
       ) : (
         <>
-          <div
-            className={cn(
-              "grid gap-3 items-center p-4 border-b relative z-30",
-              hasMapToolLinks ? "grid-cols-[auto_auto_minmax(0,1fr)_auto]" : "grid-cols-[auto_minmax(0,1fr)_auto]",
-            )}
-          >
-            <div className="flex items-center gap-3 shrink-0">
-              <div className="relative w-10 h-10">
-                <Image src="/images/isu-logo.png" alt="ISU DB MAPS Logo" fill className="object-contain" />
+          <div className="relative z-30 flex flex-col gap-3 border-b p-4 sm:flex-row sm:items-center">
+            <div className="flex min-w-0 items-center gap-2">
+              <div className="shrink-0">
+                <Button
+                  type="button"
+                  variant="ghost"
+                  size="icon"
+                  className="h-9 w-9"
+                  onClick={() => setDesktopNavOpen(true)}
+                  aria-expanded={desktopNavOpen}
+                  aria-controls="desktop-map-nav-sheet"
+                  aria-label="Deschide meniul de navigare"
+                >
+                  <MdMenu size={22} />
+                </Button>
+                <MapAppNavSheet
+                  open={desktopNavOpen}
+                  onOpenChange={setDesktopNavOpen}
+                  sheetId="desktop-map-nav-sheet"
+                  isAdmin={isAdmin}
+                  onNavigateToDashboard={handleNavigateToDashboard}
+                  onSignOut={onSignOut}
+                  showIndrumatorLink={showIndrumatorLink}
+                  showAdrLink={showAdrLink}
+                  showPreventionFullMapLink={showPreventionFullMapLink}
+                  navContext={{ type: "map", mapVariant: isPrevention ? "prevention" : "default" }}
+                />
               </div>
-              <div className="flex flex-col leading-tight">
-                <h1 className="text-2xl font-bold whitespace-nowrap">{isPrevention ? "Prevenire" : "ISU DB MAPS"}</h1>
-                {isPrevention && (
-                  <span className="text-xs font-medium text-muted-foreground">Zone competență</span>
-                )}
+              <div className="flex min-w-0 items-center gap-3">
+                <div className="relative h-10 w-10 shrink-0">
+                  <Image src="/images/isu-logo.png" alt="ISU DB MAPS Logo" fill className="object-contain" />
+                </div>
+                <div className="min-w-0 leading-tight">
+                  <h1 className="whitespace-nowrap text-2xl font-bold">{isPrevention ? "Prevenire" : "ISU DB MAPS"}</h1>
+                  {isPrevention && <span className="text-xs font-medium text-muted-foreground">Zone competență</span>}
+                </div>
               </div>
             </div>
-            {hasMapToolLinks && (
-              <div className="flex flex-col justify-center gap-1.5 border-l pl-3 min-w-0 shrink-0 max-w-[9rem]">
-                {showIndrumatorLink && (
-                  <Button variant="outline" size="sm" className="h-8 w-full justify-center px-2 text-xs" asChild type="button">
-                    <Link href="/indrumator">Îndrumător</Link>
-                  </Button>
-                )}
-                {showAdrLink && (
-                  <Button variant="outline" size="sm" className="h-8 w-full justify-center px-2 text-xs" asChild type="button">
-                    <Link href="/adr">ADR</Link>
-                  </Button>
-                )}
+            <div className="min-w-0 flex-1 px-0 sm:px-2">
+              <div className="mx-auto max-w-xl">
+                <MapLocationSearchBar />
               </div>
-            )}
-            <div className="flex justify-center min-w-0 px-2">
-              <MapLocationSearchBar className="max-w-xl" />
             </div>
-            <div className="flex items-center justify-end gap-2 sm:gap-4 shrink-0">
-              <span className="hidden lg:inline text-sm text-muted-foreground truncate max-w-[12rem]">Conectat ca {userEmail}</span>
-              {isPrevention && (
-                <Button variant="outline" size="sm" asChild type="button">
-                  <Link href="/">
-                    <MdMap size={16} className="mr-2" />
-                    Hartă generală
-                  </Link>
-                </Button>
-              )}
-              {!isPrevention && showPreventionFullMapLink && (
-                <Button variant="outline" size="sm" asChild type="button">
-                  <Link href="/prevenire">
-                    <MdHealthAndSafety size={16} className="mr-2" />
-                    Prevenire
-                  </Link>
-                </Button>
-              )}
-              {isAdmin && (
-                <Button variant="outline" size="sm" onClick={handleNavigateToDashboard} type="button">
-                  <MdDashboard size={16} className="mr-2" />
-                  Dashboard
-                </Button>
-              )}
-              <Button variant="outline" size="sm" onClick={onSignOut} type="button">
-                <MdLogout size={16} className="mr-2" />
-                Deconectare
-              </Button>
-            </div>
+            <span
+              className="hidden max-w-[12rem] shrink-0 truncate text-sm text-muted-foreground sm:inline"
+              title={userEmail}
+            >
+              Conectat ca {userEmail}
+            </span>
           </div>
-          <div className="flex-1 relative min-h-0">{renderChildren()}</div>
+          <div className="relative min-h-0 flex-1">{renderChildren()}</div>
         </>
       )}
     </div>

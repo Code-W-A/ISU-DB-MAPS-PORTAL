@@ -1,4 +1,4 @@
-const MAIN_ADMIN_EMAIL = "radu.p1995@yahoo.com"
+export const MAIN_ADMIN_EMAIL = "radu.p1995@yahoo.com"
 
 export const MAP_TOOL_LINK_TAB_INDRUMATOR = "indrumator"
 export const MAP_TOOL_LINK_TAB_ADR = "adr"
