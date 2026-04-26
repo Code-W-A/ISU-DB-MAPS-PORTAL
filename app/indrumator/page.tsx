@@ -3,7 +3,7 @@ import { ToolEmbedPage } from "@/components/tool-embed-page"
 
 export const metadata: Metadata = {
   title: "Îndrumător",
-  description: "Îndrumător SMISU — ISU Alba",
+  description: "Îndrumător SMISU — ISU DB",
 }
 
 export default function IndrumatorPage() {
