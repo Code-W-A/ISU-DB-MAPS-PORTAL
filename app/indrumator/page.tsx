@@ -1,18 +1,19 @@
 import type { Metadata } from "next"
-import { ToolEmbedPage } from "@/components/tool-embed-page"
+import { IndrumatorCauseWizard } from "@/components/indrumator/indrumator-cause-wizard"
+import { ToolPageShell } from "@/components/tool-page-shell"
+import { getIndrumatorCauseSections } from "@/lib/indrumator-data"
 
 export const metadata: Metadata = {
   title: "Îndrumător",
-  description: "Îndrumător SMISU — ISU DB",
+  description: "Îndrumător SMISU - ISU DB",
 }
 
-export default function IndrumatorPage() {
+export default async function IndrumatorPage() {
+  const sections = await getIndrumatorCauseSections()
+
   return (
-    <ToolEmbedPage
-      title="Îndrumător"
-      iframeSrc="/indrumator/index.html"
-      iframeTitle="Îndrumător SMISU"
-      tool="indrumator"
-    />
+    <ToolPageShell title="Îndrumător SMISU" tool="indrumator" contentClassName="overflow-hidden">
+      <IndrumatorCauseWizard sections={sections} />
+    </ToolPageShell>
   )
 }

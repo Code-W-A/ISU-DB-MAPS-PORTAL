@@ -2,6 +2,8 @@ export type PdfField = {
   x: number
   y: number
   maxWidth: number
+  continuationX?: number
+  continuationMaxWidth?: number
   height?: number
   fontSize?: number
   lineHeight?: number
@@ -52,15 +54,15 @@ export const anexa19Fields = {
 export const anexa20Fields = {
   inspectorat: { x: 247, y: 794, maxWidth: 135 },
   subunitateHeader: { x: 120, y: 781, maxWidth: 145 },
-  anexaNumber: { x: 141, y: 726, maxWidth: 60 },
-  pvNumber: { x: 402, y: 726, maxWidth: 56 },
-  pvDate: { x: 475, y: 726, maxWidth: 72 },
+  anexaNumber: { x: 137, y: 717, maxWidth: 62 },
+  pvNumber: { x: 383, y: 717, maxWidth: 62 },
+  pvDate: { x: 463, y: 717, maxWidth: 86 },
   day: { x: 132, y: 685, maxWidth: 25 },
   month: { x: 178, y: 685, maxWidth: 37 },
   year: { x: 230, y: 685, maxWidth: 45 },
   subunitate: { x: 337, y: 685, maxWidth: 205 },
   localitate: { x: 282, y: 671, maxWidth: 72 },
-  locInterventie: { x: 372, y: 671, maxWidth: 72 },
+  locInterventie: { x: 386, y: 671, maxWidth: 150 },
   judet: { x: 102, y: 657, maxWidth: 105 },
   strada: { x: 222, y: 657, maxWidth: 155 },
   numar: { x: 412, y: 657, maxWidth: 32 },
@@ -72,18 +74,35 @@ export const anexa20Fields = {
   producedAt: { x: 389, y: 643, maxWidth: 150 },
   eventDetails: { x: 44, y: 621, maxWidth: 505, maxLines: 1 },
   owner: { x: 283, y: 608, maxWidth: 260 },
-  affectedProperty: { x: 337, y: 580, maxWidth: 202 },
-  affectedLocality: { x: 135, y: 558, maxWidth: 120 },
-  affectedCounty: { x: 363, y: 558, maxWidth: 92 },
-  affectedStreet: { x: 504, y: 558, maxWidth: 45 },
-  affectedNumber: { x: 72, y: 537, maxWidth: 26 },
-  affectedBlock: { x: 109, y: 537, maxWidth: 26 },
-  affectedStair: { x: 165, y: 537, maxWidth: 24 },
-  affectedFloor: { x: 209, y: 537, maxWidth: 24 },
-  affectedApartment: { x: 261, y: 537, maxWidth: 28 },
-  damageDescription: { x: 218, y: 496, maxWidth: 315, maxLines: 13 },
-  adultVictims: { x: 226, y: 289, maxWidth: 300 },
-  childVictims: { x: 231, y: 261, maxWidth: 300 },
-  animals: { x: 174, y: 234, maxWidth: 355 },
-  rescued: { x: 300, y: 206, maxWidth: 230, maxLines: 3 },
+  affectedProperty: { x: 325, y: 582, maxWidth: 220 },
+  affectedLocality: { x: 120, y: 559, maxWidth: 120 },
+  affectedCounty: { x: 335, y: 559, maxWidth: 110 },
+  affectedStreet: { x: 472, y: 559, maxWidth: 74 },
+  affectedNumber: { x: 64, y: 539, maxWidth: 26 },
+  affectedBlock: { x: 110, y: 539, maxWidth: 24 },
+  affectedStair: { x: 151, y: 539, maxWidth: 24 },
+  affectedFloor: { x: 195, y: 539, maxWidth: 24 },
+  affectedApartment: { x: 246, y: 539, maxWidth: 30 },
+  damageDescription: {
+    x: 192,
+    y: 495,
+    maxWidth: 356,
+    continuationX: 42,
+    continuationMaxWidth: 506,
+    maxLines: 13,
+  },
+  adultVictimsCount: { x: 183, y: 286, maxWidth: 42 },
+  adultVictimsNames: { x: 231, y: 286, maxWidth: 305 },
+  childVictimsCount: { x: 183, y: 258, maxWidth: 42 },
+  childVictimsNames: { x: 231, y: 258, maxWidth: 305 },
+  animalsCount: { x: 144, y: 231, maxWidth: 42 },
+  animalsCategories: { x: 194, y: 231, maxWidth: 342 },
+  rescued: {
+    x: 280,
+    y: 204,
+    maxWidth: 268,
+    continuationX: 42,
+    continuationMaxWidth: 506,
+    maxLines: 3,
+  },
 } satisfies Record<string, PdfField>
