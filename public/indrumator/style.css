@@ -66,13 +66,22 @@ h1 {
     margin-bottom: 15px;
 }
 
-input[type="text"] {
+input[type="text"],
+input[type="date"],
+textarea {
     width: calc(100% - 22px);
     padding: 10px;
     margin: 5px 5px;
     border: 1px solid #ccc;
     border-radius: 10px;
     font-size: 14px;
+    font-family: inherit;
+    box-sizing: border-box;
+}
+
+textarea {
+    min-height: 72px;
+    resize: vertical;
 }
 input[type="checkbox"] {
     
@@ -133,6 +142,63 @@ button {
 
 button:hover {
     background-color: #218838;
+}
+
+.irp-form {
+    background: #f8fafc;
+    border: 1px solid #d7dee8;
+    border-radius: 6px;
+    padding: 10px;
+    margin-bottom: 15px;
+}
+
+.form-title {
+    font-weight: 700;
+    font-size: 16px;
+    margin: 8px 5px;
+    color: #1f2937;
+}
+
+.form-grid {
+    display: grid;
+    grid-template-columns: repeat(2, minmax(0, 1fr));
+    gap: 8px;
+}
+
+.form-grid label {
+    color: #1f2937;
+    font-size: 13px;
+    font-weight: 600;
+}
+
+.form-grid .span-2 {
+    grid-column: 1 / -1;
+}
+
+.generation-status {
+    min-height: 22px;
+    margin: 6px 0;
+    color: #1f2937;
+    font-size: 14px;
+    font-weight: 600;
+}
+
+.generation-status.error {
+    color: #b91c1c;
+}
+
+.generation-status.success {
+    color: #166534;
+}
+
+@media (max-width: 640px) {
+    .form-grid {
+        grid-template-columns: 1fr;
+    }
+
+    .form-grid .span-2 {
+        grid-column: auto;
+    }
 }
 
 .selected-terms {

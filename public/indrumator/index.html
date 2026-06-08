@@ -24,6 +24,160 @@
     <div class="container">
         <div class="main-title"> <b><p>ISU DB</p> INDRUMĂTOR SMISU</b>  </div>
 
+        <form id="irpForm" class="irp-form">
+            <div class="form-title">Date proces-verbal interventie</div>
+            <div class="form-grid">
+                <label>
+                    Inspectorat
+                    <input type="text" id="inspectorat" placeholder="ISU..." autocomplete="organization">
+                </label>
+                <label>
+                    Subunitate *
+                    <input type="text" id="subunitate" required placeholder="Detasamentul / Garda...">
+                </label>
+                <label>
+                    Nr. proces-verbal *
+                    <input type="text" id="pvNumber" required placeholder="ex. 123">
+                </label>
+                <label>
+                    Data *
+                    <input type="date" id="pvDate" required>
+                </label>
+                <label>
+                    Localitate / cale comunicatie
+                    <input type="text" id="localitate" placeholder="ex. Targoviste">
+                </label>
+                <label>
+                    Locul interventiei
+                    <input type="text" id="locInterventie" placeholder="ex. locuinta, DN 72 km...">
+                </label>
+                <label>
+                    Judet / sector
+                    <input type="text" id="judet" placeholder="ex. Dambovita">
+                </label>
+                <label>
+                    Strada
+                    <input type="text" id="strada">
+                </label>
+                <label>
+                    Nr.
+                    <input type="text" id="numar">
+                </label>
+                <label>
+                    Bl.
+                    <input type="text" id="bloc">
+                </label>
+                <label>
+                    Sc.
+                    <input type="text" id="scara">
+                </label>
+                <label>
+                    Et.
+                    <input type="text" id="etaj">
+                </label>
+                <label>
+                    Apt.
+                    <input type="text" id="apartament">
+                </label>
+                <label>
+                    Eveniment
+                    <input type="text" id="eventType" placeholder="incendiu / explozie / accident tehnologic">
+                </label>
+                <label class="span-2">
+                    Produs la / intre
+                    <input type="text" id="producedAt" placeholder="ora, interval sau reper temporal">
+                </label>
+                <label class="span-2">
+                    Proprietar / chirias / administrator / conducator auto
+                    <input type="text" id="owner">
+                </label>
+                <label class="span-2">
+                    Detalii eveniment
+                    <textarea id="eventDetails" rows="2"></textarea>
+                </label>
+                <label class="span-2">
+                    Situatia constatata dupa sosirea la locul interventiei
+                    <textarea id="situation" rows="3"></textarea>
+                </label>
+                <label class="span-2">
+                    Consecinte / pagube constatate
+                    <textarea id="consequences" rows="3"></textarea>
+                </label>
+                <label>
+                    Victime adulti
+                    <input type="text" id="adultVictims" placeholder="decedati/raniti, numar, nume">
+                </label>
+                <label>
+                    Victime copii
+                    <input type="text" id="childVictims" placeholder="numar, nume">
+                </label>
+                <label>
+                    Animale
+                    <input type="text" id="animals" placeholder="decedate/ranite, categorii">
+                </label>
+                <label>
+                    Nr. proprietari afectati
+                    <input type="text" id="affectedOwnersCount">
+                </label>
+                <label class="span-2">
+                    Bunuri / persoane / animale salvate
+                    <textarea id="rescued" rows="2"></textarea>
+                </label>
+                <label class="span-2">
+                    Conditii care au favorizat dezvoltarea si propagarea
+                    <textarea id="conditiiFavorizante" rows="2"></textarea>
+                </label>
+                <label class="span-2">
+                    Sediu ISU pentru date suplimentare
+                    <input type="text" id="sediuIsu">
+                </label>
+            </div>
+
+            <div class="form-title">Date Anexa 20</div>
+            <div class="form-grid">
+                <label class="span-2">
+                    Proprietatea afectata
+                    <input type="text" id="affectedProperty" placeholder="nume, prenume proprietar, tip proprietate">
+                </label>
+                <label>
+                    Localitate proprietate
+                    <input type="text" id="affectedLocality">
+                </label>
+                <label>
+                    Judet / sector proprietate
+                    <input type="text" id="affectedCounty">
+                </label>
+                <label>
+                    Strada proprietate
+                    <input type="text" id="affectedStreet">
+                </label>
+                <label>
+                    Nr.
+                    <input type="text" id="affectedNumber">
+                </label>
+                <label>
+                    Bl.
+                    <input type="text" id="affectedBlock">
+                </label>
+                <label>
+                    Sc.
+                    <input type="text" id="affectedStair">
+                </label>
+                <label>
+                    Et.
+                    <input type="text" id="affectedFloor">
+                </label>
+                <label>
+                    Apt.
+                    <input type="text" id="affectedApartment">
+                </label>
+                <label class="span-2">
+                    Descriere consecinte / pagube pentru proprietate
+                    <textarea id="damageDescription" rows="4"></textarea>
+                </label>
+            </div>
+        </form>
+
         <div class="section">
             <h1 id="togglelocul">1. Locul focarului <span class="arrow">&#9654;</span></h1>
             <div id="loculContent" class="hidden">
@@ -67,7 +221,8 @@
             </div>
         </div>
 
-        <button id="generateSource">Generează</button>
+        <button id="generateSource" type="button">Generează PDF Anexa 19 + 20</button>
+        <div id="generationStatus" class="generation-status" aria-live="polite"></div>
 
         <div id="selectedTerms" class="selected-terms"></div>
     </div>
@@ -694,26 +849,153 @@
         setupToggle('toggleMaterial', 'materialContent');
         setupToggle('toggleImprejurare', 'imprejurareContent');
 
-        document.getElementById('generateSource').addEventListener('click', function () {
+        function cleanSectionTitle(title) {
+            return title.replace('▶', '').trim();
+        }
+
+        function parseTerm(term) {
+            const match = term.match(/\d+$/);
+            return {
+                label: term.replace(/\d+$/, '').trim(),
+                code: match ? match[0] : ''
+            };
+        }
+
+        function getSelectedTerm(termsListId) {
+            const checkbox = document.querySelector(`#${termsListId} input[type="checkbox"]:checked`);
+            return checkbox ? parseTerm(checkbox.value) : { label: '', code: '' };
+        }
+
+        function getFieldValue(id) {
+            const field = document.getElementById(id);
+            return field ? field.value.trim() : '';
+        }
+
+        function setGenerationStatus(message, type = '') {
+            const status = document.getElementById('generationStatus');
+            status.textContent = message;
+            status.className = `generation-status ${type}`.trim();
+        }
+
+        function renderSelectedTerms() {
             const selectedTerms = Array.from(document.querySelectorAll('ul input[type="checkbox"]:checked'))
-                                        .map(checkbox => ({
-                                            section: checkbox.closest('div').previousElementSibling.textContent.trim(),
-                                            term: checkbox.value
-                                        }));
+                .map(checkbox => ({
+                    section: cleanSectionTitle(checkbox.closest('div').previousElementSibling.textContent),
+                    term: checkbox.value
+                }));
 
             const selectedTermsDiv = document.getElementById('selectedTerms');
             if (selectedTerms.length) {
-                selectedTermsDiv.innerHTML = '<strong>Elemente selectate:</strong><br>' + 
-                selectedTerms.map(item => {
-    const number = item.term.match(/\d+/);
-    return `<div class="selected-item"> 
-                <span class="section-title">${item.section}:</span> <br> 
-                ${item.term.replace(number ? number[0] : '', '').trim()}
-                ${number ? `<span class="number-box">${number[0]}</span>` : ''}
-            </div>`;
-}).join('');
-         } else {
+                selectedTermsDiv.innerHTML = '<strong>Elemente selectate:</strong><br>' +
+                    selectedTerms.map(item => {
+                        const parsed = parseTerm(item.term);
+                        return `<div class="selected-item">
+                            <span class="section-title">${item.section}:</span><br>
+                            ${parsed.label}
+                            ${parsed.code ? `<span class="number-box">${parsed.code}</span>` : ''}
+                        </div>`;
+                    }).join('');
+            } else {
                 selectedTermsDiv.innerHTML = 'Nu ai selectat niciun element.';
+            }
+        }
+
+        function buildIrpPayload() {
+            return {
+                common: {
+                    inspectorat: getFieldValue('inspectorat'),
+                    subunitate: getFieldValue('subunitate'),
+                    pvNumber: getFieldValue('pvNumber'),
+                    pvDate: getFieldValue('pvDate'),
+                    localitate: getFieldValue('localitate'),
+                    locInterventie: getFieldValue('locInterventie'),
+                    judet: getFieldValue('judet'),
+                    strada: getFieldValue('strada'),
+                    numar: getFieldValue('numar'),
+                    bloc: getFieldValue('bloc'),
+                    scara: getFieldValue('scara'),
+                    etaj: getFieldValue('etaj'),
+                    apartament: getFieldValue('apartament'),
+                    eventType: getFieldValue('eventType'),
+                    producedAt: getFieldValue('producedAt'),
+                    eventDetails: getFieldValue('eventDetails'),
+                    owner: getFieldValue('owner'),
+                    situation: getFieldValue('situation'),
+                    consequences: getFieldValue('consequences'),
+                    adultVictims: getFieldValue('adultVictims'),
+                    childVictims: getFieldValue('childVictims'),
+                    animals: getFieldValue('animals'),
+                    rescued: getFieldValue('rescued'),
+                    affectedOwnersCount: getFieldValue('affectedOwnersCount'),
+                    conditiiFavorizante: getFieldValue('conditiiFavorizante'),
+                    sediuIsu: getFieldValue('sediuIsu')
+                },
+                cause: {
+                    locFocar: getSelectedTerm('termsList0'),
+                    sursaProbabila: getSelectedTerm('termsList1'),
+                    mijlocAprindere: getSelectedTerm('termsList2'),
+                    primulMaterial: getSelectedTerm('termsList3'),
+                    imprejurareDeterminanta: getSelectedTerm('termsList4')
+                },
+                damage: {
+                    affectedProperty: getFieldValue('affectedProperty'),
+                    affectedLocality: getFieldValue('affectedLocality'),
+                    affectedCounty: getFieldValue('affectedCounty'),
+                    affectedStreet: getFieldValue('affectedStreet'),
+                    affectedNumber: getFieldValue('affectedNumber'),
+                    affectedBlock: getFieldValue('affectedBlock'),
+                    affectedStair: getFieldValue('affectedStair'),
+                    affectedFloor: getFieldValue('affectedFloor'),
+                    affectedApartment: getFieldValue('affectedApartment'),
+                    damageDescription: getFieldValue('damageDescription')
+                }
+            };
+        }
+
+        document.getElementById('generateSource').addEventListener('click', async function () {
+            const form = document.getElementById('irpForm');
+            if (!form.checkValidity()) {
+                form.reportValidity();
+                return;
+            }
+
+            renderSelectedTerms();
+            const button = this;
+            button.disabled = true;
+            setGenerationStatus('Se genereaza PDF-ul...');
+
+            try {
+                const response = await fetch('/api/irp/proces-verbal', {
+                    method: 'POST',
+                    headers: { 'Content-Type': 'application/json' },
+                    body: JSON.stringify(buildIrpPayload())
+                });
+
+                if (!response.ok) {
+                    let message = 'Nu s-a putut genera PDF-ul.';
+                    try {
+                        const errorBody = await response.json();
+                        if (errorBody.error) message = errorBody.error;
+                    } catch (error) {
+                        // Raspunsul nu este JSON.
+                    }
+                    throw new Error(message);
+                }
+
+                const blob = await response.blob();
+                const url = URL.createObjectURL(blob);
+                const link = document.createElement('a');
+                link.href = url;
+                link.download = 'proces-verbal-interventie-anexa-19-20.pdf';
+                document.body.appendChild(link);
+                link.click();
+                link.remove();
+                URL.revokeObjectURL(url);
+                setGenerationStatus('PDF generat si descarcat.', 'success');
+            } catch (error) {
+                setGenerationStatus(error.message || 'Nu s-a putut genera PDF-ul.', 'error');
+            } finally {
+                button.disabled = false;
             }
         });
     </script>
