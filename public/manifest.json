@@ -1,0 +1,49 @@
+{
+  "name": "ISU DB MAPS",
+  "short_name": "ISU Maps",
+  "description": "Aplicație pentru gestionarea hidranților",
+  "start_url": "/",
+  "display": "standalone",
+  "background_color": "#ffffff",
+  "theme_color": "#2563eb",
+  "orientation": "any",
+  "icons": [
+    {
+      "src": "/images/isu-logo.png",
+      "sizes": "192x192",
+      "type": "image/png",
+      "purpose": "any maskable"
+    },
+    {
+      "src": "/images/isu-logo.png",
+      "sizes": "512x512",
+      "type": "image/png",
+      "purpose": "any maskable"
+    }
+  ],
+  "shortcuts": [
+    {
+      "name": "Hartă",
+      "short_name": "Hartă",
+      "description": "Deschide harta hidranților",
+      "url": "/",
+      "icons": [{ "src": "/images/isu-logo.png", "sizes": "192x192" }]
+    }
+  ],
+  "screenshots": [
+    {
+      "src": "/images/isu-logo.png",
+      "sizes": "1080x1920",
+      "type": "image/png",
+      "form_factor": "narrow",
+      "label": "Harta hidranților"
+    },
+    {
+      "src": "/images/isu-logo.png",
+      "sizes": "1080x1920",
+      "type": "image/png",
+      "form_factor": "narrow",
+      "label": "Detalii hidrant"
+    }
+  ]
+}
