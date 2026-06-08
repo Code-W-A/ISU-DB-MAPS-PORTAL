@@ -21,12 +21,14 @@ type LegislatieFileKind = "pdf" | "word" | "excel" | "archive" | "image" | "file
 
 interface LegislatieFile {
   type: "file"
+  id?: string
   name: string
   extension: string
   kind: LegislatieFileKind
   sizeLabel: string
   path: string
   url: string
+  downloadUrl?: string
   updatedAt: string
 }
 
@@ -112,6 +114,8 @@ function getParentPath(folderPath: string) {
 }
 
 function getDisplayUrl(file: LegislatieFile) {
+  if (/^https?:\/\//i.test(file.url)) return file.url
+
   const externalBaseUrl = process.env.NEXT_PUBLIC_LEGISLATIE_BASE_URL
   if (!externalBaseUrl) return file.url
 
@@ -133,6 +137,7 @@ function getAbsoluteDisplayUrl(file: LegislatieFile) {
 function getOpenUrl(file: LegislatieFile) {
   const url = getDisplayUrl(file)
 
+  if (/drive\.google\.com/i.test(url)) return url
   if (file.kind !== "word") return url
 
   const absoluteUrl = getAbsoluteDisplayUrl(file)
@@ -142,7 +147,7 @@ function getOpenUrl(file: LegislatieFile) {
 function FileRow({ file }: { file: LegislatieFile }) {
   const Icon = getFileIcon(file.kind)
   const url = getOpenUrl(file)
-  const downloadUrl = getDisplayUrl(file)
+  const downloadUrl = file.downloadUrl ?? getDisplayUrl(file)
   const actionLabel = file.kind === "archive" ? "Descarca" : "Deschide"
   const shouldDownload = file.kind === "archive" || file.kind === "excel"
 
@@ -240,7 +245,7 @@ export function LegislatieTab() {
         <Card>
           <CardContent className="space-y-3 p-6">
             <p className="text-sm text-red-700">{error ?? "Manifestul legislatie nu este disponibil."}</p>
-            <p className="text-sm text-gray-600">Ruleaza `npm run legislatie:manifest`, apoi reporneste aplicatia daca este nevoie.</p>
+            <p className="text-sm text-gray-600">Ruleaza `npm run legislatie:import-drive` sau `npm run legislatie:manifest`, apoi reporneste aplicatia daca este nevoie.</p>
           </CardContent>
         </Card>
       </div>

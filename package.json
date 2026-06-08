@@ -10,6 +10,7 @@
     "lint": "next lint",
     "start": "next start",
     "snapshots:generate": "node scripts/generate-map-snapshots.mjs",
+    "legislatie:import-drive": "node scripts/import-legislatie-from-drive.mjs",
     "legislatie:manifest": "powershell -ExecutionPolicy Bypass -File scripts/generate-legislatie-manifest.ps1",
     "legislatie:convert-word": "powershell -ExecutionPolicy Bypass -File scripts/convert-legislatie-word-to-pdf-msword.ps1",
     "legislatie:convert-word:libreoffice": "powershell -ExecutionPolicy Bypass -File scripts/convert-legislatie-word-to-pdf.ps1"
