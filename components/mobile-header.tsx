@@ -1,10 +1,10 @@
 "use client"
 
 import { useState } from "react"
-import { Button } from "@/components/ui/button"
 import { MdMenu } from "react-icons/md"
 import { MapAppNavSheet } from "@/components/map-app-nav"
 import { MapLocationSearchBar } from "@/components/map-location-search-bridge"
+import { Button } from "@/components/ui/button"
 
 interface MobileHeaderProps {
   userEmail: string
@@ -15,6 +15,7 @@ interface MobileHeaderProps {
   showPreventionFullMapLink?: boolean
   showIndrumatorLink?: boolean
   showAdrLink?: boolean
+  showLegislatieLink?: boolean
 }
 
 export function MobileHeader({
@@ -25,6 +26,7 @@ export function MobileHeader({
   showPreventionFullMapLink = false,
   showIndrumatorLink = false,
   showAdrLink = false,
+  showLegislatieLink = false,
 }: MobileHeaderProps) {
   const [menuOpen, setMenuOpen] = useState(false)
   const isPrevention = variant === "prevention"
@@ -53,6 +55,7 @@ export function MobileHeader({
           onSignOut={onSignOut}
           showIndrumatorLink={showIndrumatorLink}
           showAdrLink={showAdrLink}
+          showLegislatieLink={showLegislatieLink}
           showPreventionFullMapLink={showPreventionFullMapLink}
           navContext={{ type: "map", mapVariant: isPrevention ? "prevention" : "default" }}
         />

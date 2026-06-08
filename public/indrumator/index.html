@@ -24,6 +24,22 @@
     <div class="container">
         <div class="main-title"> <b><p>ISU DB</p> INDRUMĂTOR SMISU</b>  </div>
 
+        <div class="wizard-panel" aria-live="polite">
+            <div class="draft-actions">
+                <button id="continueDraft" type="button" class="secondary-button">Continua draft</button>
+                <button id="newIntervention" type="button" class="secondary-button">Interventie noua</button>
+                <button id="clearSavedData" type="button" class="danger-button">Sterge date salvate</button>
+            </div>
+            <div id="draftInfo" class="draft-info">Datele se salveaza automat pe acest dispozitiv.</div>
+            <div class="step-progress">
+                <div class="step-progress-text">
+                    <span id="stepCounter">Pasul 1 din 6</span>
+                    <strong id="stepTitle">Date generale</strong>
+                </div>
+                <div class="step-track"><div id="stepProgressBar" class="step-progress-bar"></div></div>
+            </div>
+        </div>
+
         <form id="irpForm" class="irp-form">
             <div class="form-title">Date proces-verbal interventie</div>
             <div class="form-grid">
@@ -223,6 +239,12 @@
 
         <button id="generateSource" type="button">Generează PDF Anexa 19 + 20</button>
         <div id="generationStatus" class="generation-status" aria-live="polite"></div>
+        <a id="pdfDownloadLink" class="pdf-download-link hidden" download="proces-verbal-interventie-anexa-19-20.pdf">Descarca PDF-ul generat</a>
+
+        <div class="wizard-navigation">
+            <button id="prevStep" type="button" class="secondary-button">Inapoi</button>
+            <button id="nextStep" type="button">Continua</button>
+        </div>
 
         <div id="selectedTerms" class="selected-terms"></div>
     </div>
@@ -952,6 +974,8 @@
             };
         }
 
+        let generatedPdfUrl = '';
+
         document.getElementById('generateSource').addEventListener('click', async function () {
             const form = document.getElementById('irpForm');
             if (!form.checkValidity()) {
@@ -961,8 +985,16 @@
 
             renderSelectedTerms();
             const button = this;
+            const downloadLink = document.getElementById('pdfDownloadLink');
+            const previewWindow = window.open('', '_blank');
             button.disabled = true;
             setGenerationStatus('Se genereaza PDF-ul...');
+            downloadLink.classList.add('hidden');
+
+            if (generatedPdfUrl) {
+                URL.revokeObjectURL(generatedPdfUrl);
+                generatedPdfUrl = '';
+            }
 
             try {
                 const response = await fetch('/api/irp/proces-verbal', {
@@ -983,16 +1015,17 @@
                 }
 
                 const blob = await response.blob();
-                const url = URL.createObjectURL(blob);
-                const link = document.createElement('a');
-                link.href = url;
-                link.download = 'proces-verbal-interventie-anexa-19-20.pdf';
-                document.body.appendChild(link);
-                link.click();
-                link.remove();
-                URL.revokeObjectURL(url);
-                setGenerationStatus('PDF generat si descarcat.', 'success');
+                generatedPdfUrl = URL.createObjectURL(blob);
+
+                if (previewWindow) {
+                    previewWindow.location.href = generatedPdfUrl;
+                }
+
+                downloadLink.href = generatedPdfUrl;
+                downloadLink.classList.remove('hidden');
+                setGenerationStatus('PDF generat.', 'success');
             } catch (error) {
+                if (previewWindow) previewWindow.close();
                 setGenerationStatus(error.message || 'Nu s-a putut genera PDF-ul.', 'error');
             } finally {
                 button.disabled = false;
@@ -1019,6 +1052,431 @@
     setupSingleSelection('termsList3');
     setupSingleSelection('termsList4');
     setupSingleSelection('termsList0');
+
+    (function setupIrpWizard() {
+        const DRAFT_KEY = 'irp.formDraft.v1';
+        const DEFAULTS_KEY = 'irp.generalDefaults.v1';
+        const generalFieldIds = ['inspectorat', 'subunitate', 'judet', 'sediuIsu', 'localitate'];
+        const allFieldIds = [
+            'inspectorat', 'subunitate', 'pvNumber', 'pvDate', 'localitate', 'locInterventie',
+            'judet', 'strada', 'numar', 'bloc', 'scara', 'etaj', 'apartament', 'eventType',
+            'producedAt', 'owner', 'eventDetails', 'situation', 'consequences', 'adultVictims',
+            'childVictims', 'animals', 'affectedOwnersCount', 'rescued', 'conditiiFavorizante',
+            'sediuIsu', 'affectedProperty', 'affectedLocality', 'affectedCounty', 'affectedStreet',
+            'affectedNumber', 'affectedBlock', 'affectedStair', 'affectedFloor', 'affectedApartment',
+            'damageDescription'
+        ];
+        const causeLists = ['termsList0', 'termsList1', 'termsList2', 'termsList3', 'termsList4'];
+        const causeHeaders = [
+            { headerId: 'togglelocul', listId: 'termsList0' },
+            { headerId: 'toggleSursa', listId: 'termsList1' },
+            { headerId: 'toggleMijlocul', listId: 'termsList2' },
+            { headerId: 'toggleMaterial', listId: 'termsList3' },
+            { headerId: 'toggleImprejurare', listId: 'termsList4' }
+        ];
+        const steps = [
+            {
+                title: 'Date generale',
+                help: 'Completeaza datele care se repeta cel mai des. Ele se salveaza pe acest dispozitiv.',
+                fieldIds: ['inspectorat', 'subunitate', 'pvNumber', 'pvDate', 'judet', 'localitate', 'sediuIsu']
+            },
+            {
+                title: 'Loc si eveniment',
+                help: 'Adauga locul interventiei si informatiile de baza despre eveniment.',
+                fieldIds: ['locInterventie', 'strada', 'numar', 'bloc', 'scara', 'etaj', 'apartament', 'eventType', 'producedAt', 'owner', 'eventDetails']
+            },
+            {
+                title: 'Constatari',
+                help: 'Noteaza doar ce este relevant. Textele lungi sunt acceptate in PDF.',
+                fieldIds: ['situation', 'consequences', 'adultVictims', 'childVictims', 'animals', 'affectedOwnersCount', 'rescued', 'conditiiFavorizante']
+            },
+            {
+                title: 'Cauza probabila',
+                help: 'Cauta si selecteaza cate un element unde este cazul.',
+                causeStep: true
+            },
+            {
+                title: 'Pagube / Anexa 20',
+                help: 'Completeaza doar daca exista pagube sau proprietate de detaliat.',
+                anexa20Step: true,
+                fieldIds: ['affectedProperty', 'affectedLocality', 'affectedCounty', 'affectedStreet', 'affectedNumber', 'affectedBlock', 'affectedStair', 'affectedFloor', 'affectedApartment', 'damageDescription']
+            },
+            {
+                title: 'Verificare + PDF',
+                help: 'Verifica rezumatul, apoi genereaza PDF-ul.',
+                reviewStep: true
+            }
+        ];
+
+        const form = document.getElementById('irpForm');
+        const prevButton = document.getElementById('prevStep');
+        const nextButton = document.getElementById('nextStep');
+        const generateButton = document.getElementById('generateSource');
+        const stepCounter = document.getElementById('stepCounter');
+        const stepTitle = document.getElementById('stepTitle');
+        const progressBar = document.getElementById('stepProgressBar');
+        const draftInfo = document.getElementById('draftInfo');
+        const continueDraftButton = document.getElementById('continueDraft');
+        const newInterventionButton = document.getElementById('newIntervention');
+        const clearSavedDataButton = document.getElementById('clearSavedData');
+        const stepContainer = document.createElement('div');
+        let currentStep = 0;
+        let isRestoring = false;
+
+        stepContainer.id = 'wizardSteps';
+        form.prepend(stepContainer);
+
+        function getElement(id) {
+            return document.getElementById(id);
+        }
+
+        function getLabelForField(id) {
+            const field = getElement(id);
+            return field ? field.closest('label') : null;
+        }
+
+        function safeRead(key) {
+            try {
+                const raw = localStorage.getItem(key);
+                return raw ? JSON.parse(raw) : null;
+            } catch (error) {
+                return null;
+            }
+        }
+
+        function safeWrite(key, value) {
+            try {
+                localStorage.setItem(key, JSON.stringify(value));
+            } catch (error) {
+                // Spatiul de stocare local poate fi dezactivat pe unele dispozitive.
+            }
+        }
+
+        function safeRemove(key) {
+            try {
+                localStorage.removeItem(key);
+            } catch (error) {
+                // Ignoram erorile de localStorage.
+            }
+        }
+
+        function todayIsoDate() {
+            return new Date().toISOString().slice(0, 10);
+        }
+
+        function createStep(index, step) {
+            const section = document.createElement('section');
+            section.className = 'wizard-step hidden';
+            section.dataset.step = String(index);
+
+            const title = document.createElement('h2');
+            title.className = 'wizard-step-title';
+            title.textContent = step.title;
+            section.appendChild(title);
+
+            const help = document.createElement('p');
+            help.className = 'wizard-step-help';
+            help.textContent = step.help;
+            section.appendChild(help);
+
+            if (step.fieldIds) {
+                const grid = document.createElement('div');
+                grid.className = 'form-grid';
+                step.fieldIds.forEach(id => {
+                    const label = getLabelForField(id);
+                    if (label) grid.appendChild(label);
+                });
+                section.appendChild(grid);
+            }
+
+            if (step.causeStep) {
+                causeHeaders.forEach(item => {
+                    const header = getElement(item.headerId);
+                    const causeSection = header ? header.closest('.section') : null;
+                    if (causeSection) section.appendChild(causeSection);
+                });
+            }
+
+            if (step.anexa20Step) {
+                const toggle = document.createElement('label');
+                toggle.className = 'anexa-toggle';
+                toggle.innerHTML = '<input type="checkbox" id="hasDamageDetails"> Exista pagube/proprietate de detaliat';
+                section.insertBefore(toggle, section.querySelector('.form-grid'));
+            }
+
+            if (step.reviewStep) {
+                const review = document.createElement('div');
+                review.id = 'reviewSummary';
+                review.className = 'review-summary';
+                section.appendChild(review);
+                section.appendChild(document.getElementById('selectedTerms'));
+                section.appendChild(generateButton);
+                section.appendChild(document.getElementById('generationStatus'));
+                section.appendChild(document.getElementById('pdfDownloadLink'));
+            }
+
+            stepContainer.appendChild(section);
+        }
+
+        steps.forEach((step, index) => createStep(index, step));
+        form.querySelectorAll(':scope > .form-title, :scope > .form-grid').forEach(node => node.classList.add('migrated-hidden'));
+
+        const hasDamageDetails = getElement('hasDamageDetails');
+        const anexa20Grid = hasDamageDetails ? hasDamageDetails.closest('.wizard-step').querySelector('.form-grid') : null;
+
+        function collectFieldValues() {
+            const values = {};
+            allFieldIds.forEach(id => {
+                const field = getElement(id);
+                if (field) values[id] = field.value;
+            });
+            return values;
+        }
+
+        function collectCauseValues() {
+            const values = {};
+            causeLists.forEach(id => {
+                const checkbox = document.querySelector(`#${id} input[type="checkbox"]:checked`);
+                values[id] = checkbox ? checkbox.value : '';
+            });
+            return values;
+        }
+
+        function setFieldValues(values) {
+            Object.entries(values || {}).forEach(([id, value]) => {
+                const field = getElement(id);
+                if (field) field.value = value || '';
+            });
+        }
+
+        function setCauseValues(values) {
+            causeLists.forEach(id => {
+                const wanted = values && values[id] ? values[id] : '';
+                document.querySelectorAll(`#${id} input[type="checkbox"]`).forEach(checkbox => {
+                    checkbox.checked = checkbox.value === wanted;
+                });
+            });
+        }
+
+        function saveGeneralDefaults() {
+            const defaults = {};
+            generalFieldIds.forEach(id => {
+                const field = getElement(id);
+                if (field && field.value.trim()) defaults[id] = field.value.trim();
+            });
+            safeWrite(DEFAULTS_KEY, defaults);
+        }
+
+        function restoreGeneralDefaults() {
+            setFieldValues(safeRead(DEFAULTS_KEY) || {});
+        }
+
+        function saveDraft() {
+            if (isRestoring) return;
+            saveGeneralDefaults();
+            safeWrite(DRAFT_KEY, {
+                fields: collectFieldValues(),
+                causes: collectCauseValues(),
+                hasDamageDetails: Boolean(hasDamageDetails && hasDamageDetails.checked),
+                currentStep,
+                updatedAt: new Date().toISOString()
+            });
+            draftInfo.textContent = 'Draft salvat automat pe acest dispozitiv.';
+        }
+
+        function restoreDraft() {
+            const draft = safeRead(DRAFT_KEY);
+            if (!draft) {
+                restoreGeneralDefaults();
+                if (!getElement('pvDate').value) getElement('pvDate').value = todayIsoDate();
+                return;
+            }
+
+            isRestoring = true;
+            setFieldValues(draft.fields || {});
+            setCauseValues(draft.causes || {});
+            if (hasDamageDetails) hasDamageDetails.checked = Boolean(draft.hasDamageDetails);
+            if (!getElement('pvDate').value) getElement('pvDate').value = todayIsoDate();
+            currentStep = Number.isInteger(draft.currentStep) ? Math.min(Math.max(draft.currentStep, 0), steps.length - 1) : 0;
+            isRestoring = false;
+            draftInfo.textContent = 'Draft restaurat. Poti continua de unde ai ramas.';
+        }
+
+        function resetCurrentIntervention(keepDefaults, persistDraft = true) {
+            isRestoring = true;
+            allFieldIds.forEach(id => {
+                const field = getElement(id);
+                if (field) field.value = '';
+            });
+            causeLists.forEach(id => {
+                document.querySelectorAll(`#${id} input[type="checkbox"]`).forEach(checkbox => {
+                    checkbox.checked = false;
+                });
+            });
+            if (hasDamageDetails) hasDamageDetails.checked = false;
+            if (keepDefaults) restoreGeneralDefaults();
+            getElement('pvDate').value = todayIsoDate();
+            isRestoring = false;
+            syncDamageDefaults(true);
+            updateCauseTitles();
+            renderReviewSummary();
+            currentStep = 0;
+            if (!persistDraft) isRestoring = true;
+            showStep(0);
+            isRestoring = false;
+            if (!persistDraft) {
+                safeRemove(DRAFT_KEY);
+                safeRemove(DEFAULTS_KEY);
+            }
+        }
+
+        function syncDamageDefaults(force) {
+            const map = {
+                affectedProperty: 'owner',
+                affectedLocality: 'localitate',
+                affectedCounty: 'judet',
+                affectedStreet: 'strada',
+                affectedNumber: 'numar',
+                affectedBlock: 'bloc',
+                affectedStair: 'scara',
+                affectedFloor: 'etaj',
+                affectedApartment: 'apartament',
+                damageDescription: 'consequences'
+            };
+            Object.entries(map).forEach(([targetId, sourceId]) => {
+                const target = getElement(targetId);
+                const source = getElement(sourceId);
+                if (target && source && (force || !target.value.trim() || !hasDamageDetails.checked)) {
+                    target.value = source.value;
+                }
+            });
+        }
+
+        function updateAnexa20Visibility() {
+            if (!hasDamageDetails || !anexa20Grid) return;
+            anexa20Grid.classList.toggle('hidden', !hasDamageDetails.checked);
+            if (!hasDamageDetails.checked) syncDamageDefaults(true);
+        }
+
+        function updateCauseTitles() {
+            causeHeaders.forEach(item => {
+                const header = getElement(item.headerId);
+                if (!header) return;
+                let selected = header.querySelector('.cause-selected');
+                if (!selected) {
+                    selected = document.createElement('span');
+                    selected.className = 'cause-selected';
+                    header.appendChild(selected);
+                }
+                const checkbox = document.querySelector(`#${item.listId} input[type="checkbox"]:checked`);
+                selected.textContent = checkbox ? parseTerm(checkbox.value).label + (parseTerm(checkbox.value).code ? ` (${parseTerm(checkbox.value).code})` : '') : '';
+            });
+        }
+
+        function validateCurrentStep() {
+            const stepNode = stepContainer.querySelector(`[data-step="${currentStep}"]`);
+            const requiredFields = Array.from(stepNode.querySelectorAll('[required]'));
+            for (const field of requiredFields) {
+                if (!field.checkValidity()) {
+                    field.reportValidity();
+                    return false;
+                }
+            }
+            return true;
+        }
+
+        function addReviewItem(container, label, value) {
+            const item = document.createElement('div');
+            item.className = 'review-item';
+            item.innerHTML = `<strong>${label}</strong><span>${value || '-'}</span>`;
+            container.appendChild(item);
+        }
+
+        function renderReviewSummary() {
+            const container = getElement('reviewSummary');
+            if (!container) return;
+            const payload = buildIrpPayload();
+            const common = payload.common || {};
+            const cause = payload.cause || {};
+            container.innerHTML = '';
+            addReviewItem(container, 'Proces-verbal', `Nr. ${common.pvNumber || '-'} / ${common.pvDate || '-'}`);
+            addReviewItem(container, 'Subunitate', common.subunitate);
+            addReviewItem(container, 'Loc interventie', [common.localitate, common.locInterventie, common.strada, common.numar].filter(Boolean).join(', '));
+            addReviewItem(container, 'Eveniment', common.eventType);
+            addReviewItem(container, 'Situatia constatata', common.situation);
+            addReviewItem(container, 'Consecinte / pagube', common.consequences);
+            addReviewItem(container, 'Loc focar', [cause.locFocar.label, cause.locFocar.code].filter(Boolean).join(' '));
+            addReviewItem(container, 'Sursa probabila', [cause.sursaProbabila.label, cause.sursaProbabila.code].filter(Boolean).join(' '));
+            addReviewItem(container, 'Anexa 20', hasDamageDetails && hasDamageDetails.checked ? 'Se completeaza cu datele din pasul Pagube / Anexa 20.' : 'Se folosesc datele comune completate anterior.');
+        }
+
+        function showStep(index) {
+            currentStep = Math.min(Math.max(index, 0), steps.length - 1);
+            stepContainer.querySelectorAll('.wizard-step').forEach(step => {
+                step.classList.toggle('hidden', Number(step.dataset.step) !== currentStep);
+            });
+            stepCounter.textContent = `Pasul ${currentStep + 1} din ${steps.length}`;
+            stepTitle.textContent = steps[currentStep].title;
+            progressBar.style.width = `${((currentStep + 1) / steps.length) * 100}%`;
+            prevButton.disabled = currentStep === 0;
+            nextButton.classList.toggle('hidden', currentStep === steps.length - 1);
+            generateButton.classList.toggle('hidden', currentStep !== steps.length - 1);
+            if (currentStep === steps.length - 1) {
+                syncDamageDefaults(false);
+                renderSelectedTerms();
+                renderReviewSummary();
+            }
+            saveDraft();
+            window.scrollTo({ top: 0, behavior: 'smooth' });
+        }
+
+        form.addEventListener('input', function (event) {
+            if (generalFieldIds.includes(event.target.id)) saveGeneralDefaults();
+            if (['owner', 'localitate', 'judet', 'strada', 'numar', 'bloc', 'scara', 'etaj', 'apartament', 'consequences'].includes(event.target.id)) {
+                syncDamageDefaults(false);
+            }
+            saveDraft();
+        });
+
+        form.addEventListener('change', function () {
+            updateCauseTitles();
+            updateAnexa20Visibility();
+            saveDraft();
+        });
+
+        prevButton.addEventListener('click', function () {
+            showStep(currentStep - 1);
+        });
+
+        nextButton.addEventListener('click', function () {
+            if (!validateCurrentStep()) return;
+            showStep(currentStep + 1);
+        });
+
+        continueDraftButton.addEventListener('click', function () {
+            const draft = safeRead(DRAFT_KEY);
+            showStep(draft && Number.isInteger(draft.currentStep) ? draft.currentStep : currentStep);
+        });
+
+        newInterventionButton.addEventListener('click', function () {
+            safeRemove(DRAFT_KEY);
+            resetCurrentIntervention(true);
+            draftInfo.textContent = 'Interventie noua. Datele generale au fost pastrate.';
+        });
+
+        clearSavedDataButton.addEventListener('click', function () {
+            safeRemove(DRAFT_KEY);
+            safeRemove(DEFAULTS_KEY);
+            resetCurrentIntervention(false, false);
+            draftInfo.textContent = 'Datele salvate au fost sterse.';
+        });
+
+        restoreDraft();
+        syncDamageDefaults(false);
+        updateAnexa20Visibility();
+        updateCauseTitles();
+        showStep(currentStep);
+    })();
     
    
     

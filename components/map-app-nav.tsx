@@ -2,17 +2,13 @@
 
 import Link from "next/link"
 import { Button } from "@/components/ui/button"
+import { Sheet, SheetContent, SheetHeader, SheetTitle } from "@/components/ui/sheet"
 import {
-  Sheet,
-  SheetContent,
-  SheetHeader,
-  SheetTitle,
-} from "@/components/ui/sheet"
-import {
-  MdLogout,
+  MdAccountBalance,
   MdDashboard,
-  MdMap,
   MdHealthAndSafety,
+  MdLogout,
+  MdMap,
   MdMenuBook,
   MdScience,
 } from "react-icons/md"
@@ -29,8 +25,8 @@ function NavItemLink({
     <Button variant="ghost" className={cn("h-11 w-full justify-start gap-3 px-3", className)} asChild>
       <Link
         {...rest}
-        onClick={(e) => {
-          onClick?.(e)
+        onClick={(event) => {
+          onClick?.(event)
           onClose()
         }}
       >
@@ -42,7 +38,7 @@ function NavItemLink({
 
 export type MapAppNavContext =
   | { type: "map"; mapVariant: "default" | "prevention" }
-  | { type: "tool"; tool: "indrumator" | "adr" }
+  | { type: "tool"; tool: "indrumator" | "adr" | "legislatie" }
 
 export interface MapAppNavListBaseProps {
   isAdmin: boolean
@@ -50,6 +46,7 @@ export interface MapAppNavListBaseProps {
   onSignOut: () => void
   showIndrumatorLink: boolean
   showAdrLink: boolean
+  showLegislatieLink: boolean
   showPreventionFullMapLink: boolean
   onClose: () => void
   navContext: MapAppNavContext
@@ -60,43 +57,50 @@ type NavListFields = Omit<MapAppNavListBaseProps, "navContext">
 function MapAppNavListMapMode({
   mapVariant,
   onClose,
-  ...p
+  ...props
 }: NavListFields & { mapVariant: "default" | "prevention" }) {
   const isPrevention = mapVariant === "prevention"
+
   return (
     <>
-      {p.showIndrumatorLink && (
+      {props.showIndrumatorLink && (
         <NavItemLink href="/indrumator" onClose={onClose}>
           <MdMenuBook size={22} className="shrink-0" />
-          <span>Îndrumător</span>
+          <span>Indrumator</span>
         </NavItemLink>
       )}
-      {p.showAdrLink && (
+      {props.showAdrLink && (
         <NavItemLink href="/adr" onClose={onClose}>
           <MdScience size={22} className="shrink-0" />
-          <span>ADR substanțe</span>
+          <span>ADR substante</span>
+        </NavItemLink>
+      )}
+      {props.showLegislatieLink && (
+        <NavItemLink href="/legislatie" onClose={onClose}>
+          <MdAccountBalance size={22} className="shrink-0" />
+          <span>Legislatie</span>
         </NavItemLink>
       )}
       {isPrevention && (
         <NavItemLink href="/" onClose={onClose}>
           <MdMap size={22} className="shrink-0" />
-          <span>Hartă generală</span>
+          <span>Harta generala</span>
         </NavItemLink>
       )}
-      {!isPrevention && p.showPreventionFullMapLink && (
+      {!isPrevention && props.showPreventionFullMapLink && (
         <NavItemLink href="/prevenire" onClose={onClose}>
           <MdHealthAndSafety size={22} className="shrink-0" />
           <span>Prevenire</span>
         </NavItemLink>
       )}
-      {p.isAdmin && p.onNavigateToDashboard && (
+      {props.isAdmin && props.onNavigateToDashboard && (
         <Button
           type="button"
           variant="ghost"
           className="h-11 w-full justify-start gap-3 px-3"
           onClick={() => {
             onClose()
-            p.onNavigateToDashboard?.()
+            props.onNavigateToDashboard?.()
           }}
         >
           <MdDashboard size={22} className="shrink-0" />
@@ -110,7 +114,7 @@ function MapAppNavListMapMode({
           className="h-11 w-full justify-start gap-3 px-3 text-destructive hover:bg-destructive/10 hover:text-destructive"
           onClick={() => {
             onClose()
-            p.onSignOut()
+            props.onSignOut()
           }}
         >
           <MdLogout size={22} className="shrink-0" />
@@ -121,39 +125,45 @@ function MapAppNavListMapMode({
   )
 }
 
-function MapAppNavListToolMode({ onClose, ...p }: NavListFields) {
+function MapAppNavListToolMode({ onClose, ...props }: NavListFields) {
   return (
     <>
       <NavItemLink href="/" onClose={onClose}>
         <MdMap size={22} className="shrink-0" />
-        <span>Hartă generală</span>
+        <span>Harta generala</span>
       </NavItemLink>
-      {p.showPreventionFullMapLink && (
+      {props.showPreventionFullMapLink && (
         <NavItemLink href="/prevenire" onClose={onClose}>
           <MdHealthAndSafety size={22} className="shrink-0" />
           <span>Prevenire</span>
         </NavItemLink>
       )}
-      {p.showIndrumatorLink && (
+      {props.showIndrumatorLink && (
         <NavItemLink href="/indrumator" onClose={onClose}>
           <MdMenuBook size={22} className="shrink-0" />
-          <span>Îndrumător</span>
+          <span>Indrumator</span>
         </NavItemLink>
       )}
-      {p.showAdrLink && (
+      {props.showAdrLink && (
         <NavItemLink href="/adr" onClose={onClose}>
           <MdScience size={22} className="shrink-0" />
-          <span>ADR substanțe</span>
+          <span>ADR substante</span>
         </NavItemLink>
       )}
-      {p.isAdmin && p.onNavigateToDashboard && (
+      {props.showLegislatieLink && (
+        <NavItemLink href="/legislatie" onClose={onClose}>
+          <MdAccountBalance size={22} className="shrink-0" />
+          <span>Legislatie</span>
+        </NavItemLink>
+      )}
+      {props.isAdmin && props.onNavigateToDashboard && (
         <Button
           type="button"
           variant="ghost"
           className="h-11 w-full justify-start gap-3 px-3"
           onClick={() => {
             onClose()
-            p.onNavigateToDashboard?.()
+            props.onNavigateToDashboard?.()
           }}
         >
           <MdDashboard size={22} className="shrink-0" />
@@ -167,7 +177,7 @@ function MapAppNavListToolMode({ onClose, ...p }: NavListFields) {
           className="h-11 w-full justify-start gap-3 px-3 text-destructive hover:bg-destructive/10 hover:text-destructive"
           onClick={() => {
             onClose()
-            p.onSignOut()
+            props.onSignOut()
           }}
         >
           <MdLogout size={22} className="shrink-0" />
@@ -180,16 +190,12 @@ function MapAppNavListToolMode({ onClose, ...p }: NavListFields) {
 
 export function MapAppNavList(props: MapAppNavListBaseProps) {
   const { navContext, onClose, ...base } = props
+
   if (navContext.type === "tool") {
     return <MapAppNavListToolMode {...base} onClose={onClose} />
   }
-  return (
-    <MapAppNavListMapMode
-      {...base}
-      onClose={onClose}
-      mapVariant={navContext.mapVariant}
-    />
-  )
+
+  return <MapAppNavListMapMode {...base} onClose={onClose} mapVariant={navContext.mapVariant} />
 }
 
 export type MapAppNavSheetProps = Omit<MapAppNavListBaseProps, "onClose"> & {
@@ -210,24 +216,14 @@ export function MapAppNavSheet({
 }: MapAppNavSheetProps) {
   return (
     <Sheet open={open} onOpenChange={onOpenChange}>
-      <SheetContent
-        id={sheetId}
-        side="left"
-        className="flex h-full w-full max-w-sm flex-col p-0"
-      >
+      <SheetContent id={sheetId} side="left" className="flex h-full w-full max-w-sm flex-col p-0">
         {showTitle && (
           <SheetHeader className="border-b px-6 py-4 text-left">
             <SheetTitle>{title}</SheetTitle>
           </SheetHeader>
         )}
-        <nav
-          className="flex min-h-0 flex-1 flex-col overflow-y-auto px-2 py-3"
-          aria-label="Meniul principal"
-        >
-          <MapAppNavList
-            {...listProps}
-            onClose={() => onOpenChange(false)}
-          />
+        <nav className="flex min-h-0 flex-1 flex-col overflow-y-auto px-2 py-3" aria-label="Meniul principal">
+          <MapAppNavList {...listProps} onClose={() => onOpenChange(false)} />
         </nav>
       </SheetContent>
     </Sheet>

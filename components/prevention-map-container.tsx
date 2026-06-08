@@ -34,6 +34,7 @@ function PreventionMapGml({
         isAdmin={nav.hasDashboardAccess}
         showIndrumatorLink={nav.mapToolLinks.showIndrumatorLink}
         showAdrLink={nav.mapToolLinks.showAdrLink}
+        showLegislatieLink={nav.mapToolLinks.showLegislatieLink}
       >
         <PreventionFullPageMap access={access} allUsers={allUsers} />
       </GoogleMapsLoader>
