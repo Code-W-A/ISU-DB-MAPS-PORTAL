@@ -25,15 +25,10 @@
         <div class="main-title"> <b><p>ISU DB</p> INDRUMĂTOR SMISU</b>  </div>
 
         <div class="wizard-panel" aria-live="polite">
-            <div class="draft-actions">
-                <button id="continueDraft" type="button" class="secondary-button">Continua draft</button>
-                <button id="newIntervention" type="button" class="secondary-button">Interventie noua</button>
-                <button id="clearSavedData" type="button" class="danger-button">Sterge date salvate</button>
-            </div>
-            <div id="draftInfo" class="draft-info">Datele se salveaza automat pe acest dispozitiv.</div>
+            <div id="draftInfo" class="draft-info">Datele generale se completeaza automat pe acest dispozitiv.</div>
             <div class="step-progress">
                 <div class="step-progress-text">
-                    <span id="stepCounter">Pasul 1 din 6</span>
+                    <span id="stepCounter">Pasul 1 din 10</span>
                     <strong id="stepTitle">Date generale</strong>
                 </div>
                 <div class="step-track"><div id="stepProgressBar" class="step-progress-bar"></div></div>
@@ -865,12 +860,6 @@
             });
         }
 
-        setupToggle('togglelocul', 'loculContent');
-        setupToggle('toggleSursa', 'sursaContent');
-        setupToggle('toggleMijlocul', 'mijloculContent');
-        setupToggle('toggleMaterial', 'materialContent');
-        setupToggle('toggleImprejurare', 'imprejurareContent');
-
         function cleanSectionTitle(title) {
             return title.replace('▶', '').trim();
         }
@@ -1054,30 +1043,19 @@
     setupSingleSelection('termsList0');
 
     (function setupIrpWizard() {
-        const DRAFT_KEY = 'irp.formDraft.v1';
         const DEFAULTS_KEY = 'irp.generalDefaults.v1';
         const generalFieldIds = ['inspectorat', 'subunitate', 'judet', 'sediuIsu', 'localitate'];
-        const allFieldIds = [
-            'inspectorat', 'subunitate', 'pvNumber', 'pvDate', 'localitate', 'locInterventie',
-            'judet', 'strada', 'numar', 'bloc', 'scara', 'etaj', 'apartament', 'eventType',
-            'producedAt', 'owner', 'eventDetails', 'situation', 'consequences', 'adultVictims',
-            'childVictims', 'animals', 'affectedOwnersCount', 'rescued', 'conditiiFavorizante',
-            'sediuIsu', 'affectedProperty', 'affectedLocality', 'affectedCounty', 'affectedStreet',
-            'affectedNumber', 'affectedBlock', 'affectedStair', 'affectedFloor', 'affectedApartment',
-            'damageDescription'
-        ];
-        const causeLists = ['termsList0', 'termsList1', 'termsList2', 'termsList3', 'termsList4'];
-        const causeHeaders = [
-            { headerId: 'togglelocul', listId: 'termsList0' },
-            { headerId: 'toggleSursa', listId: 'termsList1' },
-            { headerId: 'toggleMijlocul', listId: 'termsList2' },
-            { headerId: 'toggleMaterial', listId: 'termsList3' },
-            { headerId: 'toggleImprejurare', listId: 'termsList4' }
+        const causeSections = [
+            { headerId: 'togglelocul', contentId: 'loculContent', listId: 'termsList0', title: 'Locul focarului' },
+            { headerId: 'toggleSursa', contentId: 'sursaContent', listId: 'termsList1', title: 'Sursa probabila de aprindere' },
+            { headerId: 'toggleMijlocul', contentId: 'mijloculContent', listId: 'termsList2', title: 'Mijlocul care putea produce aprinderea' },
+            { headerId: 'toggleMaterial', contentId: 'materialContent', listId: 'termsList3', title: 'Primul material care a ars' },
+            { headerId: 'toggleImprejurare', contentId: 'imprejurareContent', listId: 'termsList4', title: 'Imprejurarea determinanta' }
         ];
         const steps = [
             {
                 title: 'Date generale',
-                help: 'Completeaza datele care se repeta cel mai des. Ele se salveaza pe acest dispozitiv.',
+                help: 'Completeaza datele generale care se folosesc des. Ele se salveaza automat pe acest dispozitiv.',
                 fieldIds: ['inspectorat', 'subunitate', 'pvNumber', 'pvDate', 'judet', 'localitate', 'sediuIsu']
             },
             {
@@ -1087,13 +1065,33 @@
             },
             {
                 title: 'Constatari',
-                help: 'Noteaza doar ce este relevant. Textele lungi sunt acceptate in PDF.',
+                help: 'Noteaza doar ce este relevant pentru interventia curenta.',
                 fieldIds: ['situation', 'consequences', 'adultVictims', 'childVictims', 'animals', 'affectedOwnersCount', 'rescued', 'conditiiFavorizante']
             },
             {
-                title: 'Cauza probabila',
-                help: 'Cauta si selecteaza cate un element unde este cazul.',
-                causeStep: true
+                title: 'Locul focarului',
+                help: 'Cauta si selecteaza varianta potrivita.',
+                causeSectionId: 'togglelocul'
+            },
+            {
+                title: 'Sursa probabila de aprindere',
+                help: 'Cauta si selecteaza varianta potrivita.',
+                causeSectionId: 'toggleSursa'
+            },
+            {
+                title: 'Mijlocul care putea produce aprinderea',
+                help: 'Cauta si selecteaza varianta potrivita.',
+                causeSectionId: 'toggleMijlocul'
+            },
+            {
+                title: 'Primul material care a ars',
+                help: 'Cauta si selecteaza varianta potrivita.',
+                causeSectionId: 'toggleMaterial'
+            },
+            {
+                title: 'Imprejurarea determinanta',
+                help: 'Cauta si selecteaza varianta potrivita.',
+                causeSectionId: 'toggleImprejurare'
             },
             {
                 title: 'Pagube / Anexa 20',
@@ -1116,12 +1114,8 @@
         const stepTitle = document.getElementById('stepTitle');
         const progressBar = document.getElementById('stepProgressBar');
         const draftInfo = document.getElementById('draftInfo');
-        const continueDraftButton = document.getElementById('continueDraft');
-        const newInterventionButton = document.getElementById('newIntervention');
-        const clearSavedDataButton = document.getElementById('clearSavedData');
         const stepContainer = document.createElement('div');
         let currentStep = 0;
-        let isRestoring = false;
 
         stepContainer.id = 'wizardSteps';
         form.prepend(stepContainer);
@@ -1152,16 +1146,34 @@
             }
         }
 
-        function safeRemove(key) {
-            try {
-                localStorage.removeItem(key);
-            } catch (error) {
-                // Ignoram erorile de localStorage.
-            }
-        }
-
         function todayIsoDate() {
             return new Date().toISOString().slice(0, 10);
+        }
+
+        function setFieldValues(values) {
+            Object.entries(values || {}).forEach(([id, value]) => {
+                const field = getElement(id);
+                if (field) field.value = value || '';
+            });
+        }
+
+        function saveGeneralDefaults() {
+            const defaults = {};
+            generalFieldIds.forEach(id => {
+                const field = getElement(id);
+                if (field && field.value.trim()) defaults[id] = field.value.trim();
+            });
+            safeWrite(DEFAULTS_KEY, defaults);
+            draftInfo.textContent = 'Datele generale se actualizeaza automat pe acest dispozitiv.';
+        }
+
+        function restoreGeneralDefaults() {
+            setFieldValues(safeRead(DEFAULTS_KEY) || {});
+        }
+
+        function getCauseSection(sectionId) {
+            const header = getElement(sectionId);
+            return header ? header.closest('.section') : null;
         }
 
         function createStep(index, step) {
@@ -1189,12 +1201,15 @@
                 section.appendChild(grid);
             }
 
-            if (step.causeStep) {
-                causeHeaders.forEach(item => {
-                    const header = getElement(item.headerId);
-                    const causeSection = header ? header.closest('.section') : null;
-                    if (causeSection) section.appendChild(causeSection);
-                });
+            if (step.causeSectionId) {
+                const causeSection = getCauseSection(step.causeSectionId);
+                if (causeSection) {
+                    causeSection.classList.add('cause-step-section');
+                    const causeConfig = causeSections.find(item => item.headerId === step.causeSectionId);
+                    const causeContent = causeConfig ? getElement(causeConfig.contentId) : null;
+                    if (causeContent) causeContent.classList.remove('hidden');
+                    section.appendChild(causeSection);
+                }
             }
 
             if (step.anexa20Step) {
@@ -1223,112 +1238,6 @@
 
         const hasDamageDetails = getElement('hasDamageDetails');
         const anexa20Grid = hasDamageDetails ? hasDamageDetails.closest('.wizard-step').querySelector('.form-grid') : null;
-
-        function collectFieldValues() {
-            const values = {};
-            allFieldIds.forEach(id => {
-                const field = getElement(id);
-                if (field) values[id] = field.value;
-            });
-            return values;
-        }
-
-        function collectCauseValues() {
-            const values = {};
-            causeLists.forEach(id => {
-                const checkbox = document.querySelector(`#${id} input[type="checkbox"]:checked`);
-                values[id] = checkbox ? checkbox.value : '';
-            });
-            return values;
-        }
-
-        function setFieldValues(values) {
-            Object.entries(values || {}).forEach(([id, value]) => {
-                const field = getElement(id);
-                if (field) field.value = value || '';
-            });
-        }
-
-        function setCauseValues(values) {
-            causeLists.forEach(id => {
-                const wanted = values && values[id] ? values[id] : '';
-                document.querySelectorAll(`#${id} input[type="checkbox"]`).forEach(checkbox => {
-                    checkbox.checked = checkbox.value === wanted;
-                });
-            });
-        }
-
-        function saveGeneralDefaults() {
-            const defaults = {};
-            generalFieldIds.forEach(id => {
-                const field = getElement(id);
-                if (field && field.value.trim()) defaults[id] = field.value.trim();
-            });
-            safeWrite(DEFAULTS_KEY, defaults);
-        }
-
-        function restoreGeneralDefaults() {
-            setFieldValues(safeRead(DEFAULTS_KEY) || {});
-        }
-
-        function saveDraft() {
-            if (isRestoring) return;
-            saveGeneralDefaults();
-            safeWrite(DRAFT_KEY, {
-                fields: collectFieldValues(),
-                causes: collectCauseValues(),
-                hasDamageDetails: Boolean(hasDamageDetails && hasDamageDetails.checked),
-                currentStep,
-                updatedAt: new Date().toISOString()
-            });
-            draftInfo.textContent = 'Draft salvat automat pe acest dispozitiv.';
-        }
-
-        function restoreDraft() {
-            const draft = safeRead(DRAFT_KEY);
-            if (!draft) {
-                restoreGeneralDefaults();
-                if (!getElement('pvDate').value) getElement('pvDate').value = todayIsoDate();
-                return;
-            }
-
-            isRestoring = true;
-            setFieldValues(draft.fields || {});
-            setCauseValues(draft.causes || {});
-            if (hasDamageDetails) hasDamageDetails.checked = Boolean(draft.hasDamageDetails);
-            if (!getElement('pvDate').value) getElement('pvDate').value = todayIsoDate();
-            currentStep = Number.isInteger(draft.currentStep) ? Math.min(Math.max(draft.currentStep, 0), steps.length - 1) : 0;
-            isRestoring = false;
-            draftInfo.textContent = 'Draft restaurat. Poti continua de unde ai ramas.';
-        }
-
-        function resetCurrentIntervention(keepDefaults, persistDraft = true) {
-            isRestoring = true;
-            allFieldIds.forEach(id => {
-                const field = getElement(id);
-                if (field) field.value = '';
-            });
-            causeLists.forEach(id => {
-                document.querySelectorAll(`#${id} input[type="checkbox"]`).forEach(checkbox => {
-                    checkbox.checked = false;
-                });
-            });
-            if (hasDamageDetails) hasDamageDetails.checked = false;
-            if (keepDefaults) restoreGeneralDefaults();
-            getElement('pvDate').value = todayIsoDate();
-            isRestoring = false;
-            syncDamageDefaults(true);
-            updateCauseTitles();
-            renderReviewSummary();
-            currentStep = 0;
-            if (!persistDraft) isRestoring = true;
-            showStep(0);
-            isRestoring = false;
-            if (!persistDraft) {
-                safeRemove(DRAFT_KEY);
-                safeRemove(DEFAULTS_KEY);
-            }
-        }
 
         function syncDamageDefaults(force) {
             const map = {
@@ -1359,7 +1268,7 @@
         }
 
         function updateCauseTitles() {
-            causeHeaders.forEach(item => {
+            causeSections.forEach(item => {
                 const header = getElement(item.headerId);
                 if (!header) return;
                 let selected = header.querySelector('.cause-selected');
@@ -1407,6 +1316,9 @@
             addReviewItem(container, 'Consecinte / pagube', common.consequences);
             addReviewItem(container, 'Loc focar', [cause.locFocar.label, cause.locFocar.code].filter(Boolean).join(' '));
             addReviewItem(container, 'Sursa probabila', [cause.sursaProbabila.label, cause.sursaProbabila.code].filter(Boolean).join(' '));
+            addReviewItem(container, 'Mijlocul care putea produce aprinderea', [cause.mijlocAprindere.label, cause.mijlocAprindere.code].filter(Boolean).join(' '));
+            addReviewItem(container, 'Primul material care a ars', [cause.primulMaterial.label, cause.primulMaterial.code].filter(Boolean).join(' '));
+            addReviewItem(container, 'Imprejurarea determinanta', [cause.imprejurareDeterminanta.label, cause.imprejurareDeterminanta.code].filter(Boolean).join(' '));
             addReviewItem(container, 'Anexa 20', hasDamageDetails && hasDamageDetails.checked ? 'Se completeaza cu datele din pasul Pagube / Anexa 20.' : 'Se folosesc datele comune completate anterior.');
         }
 
@@ -1426,7 +1338,6 @@
                 renderSelectedTerms();
                 renderReviewSummary();
             }
-            saveDraft();
             window.scrollTo({ top: 0, behavior: 'smooth' });
         }
 
@@ -1435,13 +1346,11 @@
             if (['owner', 'localitate', 'judet', 'strada', 'numar', 'bloc', 'scara', 'etaj', 'apartament', 'consequences'].includes(event.target.id)) {
                 syncDamageDefaults(false);
             }
-            saveDraft();
         });
 
         form.addEventListener('change', function () {
             updateCauseTitles();
             updateAnexa20Visibility();
-            saveDraft();
         });
 
         prevButton.addEventListener('click', function () {
@@ -1453,29 +1362,12 @@
             showStep(currentStep + 1);
         });
 
-        continueDraftButton.addEventListener('click', function () {
-            const draft = safeRead(DRAFT_KEY);
-            showStep(draft && Number.isInteger(draft.currentStep) ? draft.currentStep : currentStep);
-        });
-
-        newInterventionButton.addEventListener('click', function () {
-            safeRemove(DRAFT_KEY);
-            resetCurrentIntervention(true);
-            draftInfo.textContent = 'Interventie noua. Datele generale au fost pastrate.';
-        });
-
-        clearSavedDataButton.addEventListener('click', function () {
-            safeRemove(DRAFT_KEY);
-            safeRemove(DEFAULTS_KEY);
-            resetCurrentIntervention(false, false);
-            draftInfo.textContent = 'Datele salvate au fost sterse.';
-        });
-
-        restoreDraft();
+        restoreGeneralDefaults();
+        if (!getElement('pvDate').value) getElement('pvDate').value = todayIsoDate();
         syncDamageDefaults(false);
         updateAnexa20Visibility();
         updateCauseTitles();
-        showStep(currentStep);
+        showStep(0);
     })();
     
    

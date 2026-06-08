@@ -155,9 +155,10 @@ button:hover {
 .wizard-panel {
     background: #ffffff;
     border: 1px solid #d7dee8;
-    border-radius: 6px;
-    padding: 10px;
-    margin-bottom: 10px;
+    border-radius: 12px;
+    padding: 14px;
+    margin-bottom: 14px;
+    box-shadow: 0 10px 24px rgba(15, 23, 42, 0.06);
 }
 
 .draft-actions,
@@ -168,15 +169,19 @@ button:hover {
 }
 
 .wizard-navigation {
-    grid-template-columns: 1fr 1fr;
-    margin: 12px 0;
+    grid-template-columns: 1fr;
+    gap: 12px;
+    margin: 22px 0 0;
+    padding-top: 18px;
+    border-top: 1px solid #d7dee8;
 }
 
 .secondary-button,
 .danger-button {
     background-color: #334155;
-    padding: 8px;
-    font-size: 14px;
+    padding: 10px 12px;
+    font-size: 15px;
+    min-height: 46px;
 }
 
 .danger-button {
@@ -192,9 +197,9 @@ button:hover {
 }
 
 .draft-info {
-    margin: 8px 0;
+    margin: 0 0 10px;
     color: #475569;
-    font-size: 13px;
+    font-size: 14px;
     font-weight: 600;
 }
 
@@ -224,6 +229,11 @@ button:hover {
 
 .wizard-step {
     display: block;
+    border: 1px solid #d7dee8;
+    border-radius: 12px;
+    padding: 18px;
+    background: #ffffff;
+    box-shadow: 0 12px 28px rgba(15, 23, 42, 0.05);
 }
 
 .wizard-step.hidden {
@@ -231,16 +241,17 @@ button:hover {
 }
 
 .wizard-step-title {
-    margin: 0 0 10px;
+    margin: 0 0 12px;
     color: #0f172a;
-    font-size: 18px;
+    font-size: 20px;
 }
 
 .wizard-step-help {
-    margin: -4px 0 12px;
+    margin: 0 0 16px;
     color: #475569;
     font-size: 14px;
     font-weight: 600;
+    line-height: 1.5;
 }
 
 .migrated-hidden {
@@ -303,7 +314,7 @@ button:hover {
 .form-grid {
     display: grid;
     grid-template-columns: repeat(2, minmax(0, 1fr));
-    gap: 8px;
+    gap: 12px;
 }
 
 .form-grid label {
@@ -318,7 +329,7 @@ button:hover {
 
 .generation-status {
     min-height: 22px;
-    margin: 6px 0;
+    margin: 10px 0 0;
     color: #1f2937;
     font-size: 14px;
     font-weight: 600;
@@ -334,8 +345,8 @@ button:hover {
 
 .pdf-download-link {
     display: block;
-    margin: 8px 0 12px;
-    padding: 8px;
+    margin: 12px 0 0;
+    padding: 10px 12px;
     border-radius: 4px;
     background: #1d4ed8;
     color: #ffffff;
@@ -346,6 +357,40 @@ button:hover {
 
 .pdf-download-link:hover {
     background: #1e40af;
+}
+
+.cause-step-section {
+    margin-top: 8px;
+}
+
+.cause-step-section h1 {
+    cursor: default;
+    background: #eff6ff;
+    color: #0f172a;
+    border: 1px solid #bfdbfe;
+    border-radius: 10px;
+    padding: 12px 14px;
+    font-size: 16px;
+}
+
+.cause-step-section .arrow {
+    display: none;
+}
+
+.cause-step-section input[type="text"] {
+    margin-top: 12px;
+}
+
+.cause-step-section ul {
+    margin-top: 10px;
+    max-height: 420px;
+}
+
+.cause-step-section .cause-selected {
+    margin-left: 10px;
+    color: #1d4ed8;
+    font-size: 12px;
+    font-weight: 700;
 }
 
 @media (max-width: 640px) {
@@ -364,6 +409,10 @@ button:hover {
 
     .form-grid .span-2 {
         grid-column: auto;
+    }
+
+    .wizard-step {
+        padding: 14px;
     }
 }
 
