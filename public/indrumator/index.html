@@ -235,9 +235,18 @@
         <button id="generateSource" type="button">Generează PDF Anexa 19 + 20</button>
         <div id="generationStatus" class="generation-status" aria-live="polite"></div>
         <a id="pdfDownloadLink" class="pdf-download-link hidden" download="proces-verbal-interventie-anexa-19-20.pdf">Descarca PDF-ul generat</a>
+        <div id="postGenerationActions" class="post-generation-actions hidden">
+            <p>Daca observi ceva de corectat dupa previzualizare/descarcare, poti reveni rapid la date si apoi regenera PDF-ul.</p>
+            <div class="post-generation-grid">
+                <button id="editGeneralAfterGeneration" type="button" class="secondary-button">Editeaza date PV</button>
+                <button id="editFindingsAfterGeneration" type="button" class="secondary-button">Editeaza constatari</button>
+                <button id="editDamageAfterGeneration" type="button" class="secondary-button">Editeaza pagube / Anexa 20</button>
+            </div>
+        </div>
 
         <div class="wizard-navigation">
             <button id="prevStep" type="button" class="secondary-button">Inapoi</button>
+            <button id="jumpReviewStep" type="button" class="secondary-button hidden">Verificare PDF</button>
             <button id="nextStep" type="button">Continua</button>
         </div>
 
@@ -964,6 +973,7 @@
         }
 
         let generatedPdfUrl = '';
+        let hasGeneratedPdfHistory = false;
 
         document.getElementById('generateSource').addEventListener('click', async function () {
             const form = document.getElementById('irpForm');
@@ -975,10 +985,12 @@
             renderSelectedTerms();
             const button = this;
             const downloadLink = document.getElementById('pdfDownloadLink');
+            const postGenerationActions = document.getElementById('postGenerationActions');
             const previewWindow = window.open('', '_blank');
             button.disabled = true;
             setGenerationStatus('Se genereaza PDF-ul...');
             downloadLink.classList.add('hidden');
+            if (postGenerationActions) postGenerationActions.classList.add('hidden');
 
             if (generatedPdfUrl) {
                 URL.revokeObjectURL(generatedPdfUrl);
@@ -1012,7 +1024,10 @@
 
                 downloadLink.href = generatedPdfUrl;
                 downloadLink.classList.remove('hidden');
-                setGenerationStatus('PDF generat.', 'success');
+                hasGeneratedPdfHistory = true;
+                if (postGenerationActions) postGenerationActions.classList.remove('hidden');
+                button.textContent = 'Regenereaza PDF Anexa 19 + 20';
+                setGenerationStatus('PDF generat. Daca vezi ceva de corectat, revino la editare si regenereaza.', 'success');
             } catch (error) {
                 if (previewWindow) previewWindow.close();
                 setGenerationStatus(error.message || 'Nu s-a putut genera PDF-ul.', 'error');
@@ -1109,12 +1124,21 @@
         const form = document.getElementById('irpForm');
         const prevButton = document.getElementById('prevStep');
         const nextButton = document.getElementById('nextStep');
+        const jumpReviewButton = document.getElementById('jumpReviewStep');
         const generateButton = document.getElementById('generateSource');
         const stepCounter = document.getElementById('stepCounter');
         const stepTitle = document.getElementById('stepTitle');
         const progressBar = document.getElementById('stepProgressBar');
         const draftInfo = document.getElementById('draftInfo');
+        const postGenerationActions = document.getElementById('postGenerationActions');
+        const editGeneralButton = document.getElementById('editGeneralAfterGeneration');
+        const editFindingsButton = document.getElementById('editFindingsAfterGeneration');
+        const editDamageButton = document.getElementById('editDamageAfterGeneration');
         const stepContainer = document.createElement('div');
+        const REVIEW_STEP_INDEX = steps.length - 1;
+        const GENERAL_STEP_INDEX = 0;
+        const FINDINGS_STEP_INDEX = steps.findIndex(step => step.title === 'Constatari');
+        const DAMAGE_STEP_INDEX = steps.findIndex(step => step.anexa20Step);
         let currentStep = 0;
 
         stepContainer.id = 'wizardSteps';
@@ -1228,6 +1252,7 @@
                 section.appendChild(generateButton);
                 section.appendChild(document.getElementById('generationStatus'));
                 section.appendChild(document.getElementById('pdfDownloadLink'));
+                section.appendChild(postGenerationActions);
             }
 
             stepContainer.appendChild(section);
@@ -1322,6 +1347,20 @@
             addReviewItem(container, 'Anexa 20', hasDamageDetails && hasDamageDetails.checked ? 'Se completeaza cu datele din pasul Pagube / Anexa 20.' : 'Se folosesc datele comune completate anterior.');
         }
 
+        function markGeneratedPdfStale() {
+            if (!hasGeneratedPdfHistory || !generatedPdfUrl) return;
+            URL.revokeObjectURL(generatedPdfUrl);
+            generatedPdfUrl = '';
+            const downloadLink = getElement('pdfDownloadLink');
+            if (downloadLink) {
+                downloadLink.removeAttribute('href');
+                downloadLink.classList.add('hidden');
+            }
+            if (postGenerationActions) postGenerationActions.classList.add('hidden');
+            generateButton.textContent = 'Genereaza PDF actualizat';
+            setGenerationStatus('Ai modificat datele. Revino la verificare si genereaza din nou PDF-ul.');
+        }
+
         function showStep(index) {
             currentStep = Math.min(Math.max(index, 0), steps.length - 1);
             stepContainer.querySelectorAll('.wizard-step').forEach(step => {
@@ -1331,9 +1370,10 @@
             stepTitle.textContent = steps[currentStep].title;
             progressBar.style.width = `${((currentStep + 1) / steps.length) * 100}%`;
             prevButton.disabled = currentStep === 0;
-            nextButton.classList.toggle('hidden', currentStep === steps.length - 1);
-            generateButton.classList.toggle('hidden', currentStep !== steps.length - 1);
-            if (currentStep === steps.length - 1) {
+            nextButton.classList.toggle('hidden', currentStep === REVIEW_STEP_INDEX);
+            generateButton.classList.toggle('hidden', currentStep !== REVIEW_STEP_INDEX);
+            jumpReviewButton.classList.toggle('hidden', !hasGeneratedPdfHistory || currentStep === REVIEW_STEP_INDEX);
+            if (currentStep === REVIEW_STEP_INDEX) {
                 syncDamageDefaults(false);
                 renderSelectedTerms();
                 renderReviewSummary();
@@ -1346,11 +1386,13 @@
             if (['owner', 'localitate', 'judet', 'strada', 'numar', 'bloc', 'scara', 'etaj', 'apartament', 'consequences'].includes(event.target.id)) {
                 syncDamageDefaults(false);
             }
+            if (!event.target.id || !event.target.id.startsWith('searchInput')) markGeneratedPdfStale();
         });
 
-        form.addEventListener('change', function () {
+        form.addEventListener('change', function (event) {
             updateCauseTitles();
             updateAnexa20Visibility();
+            if (!event.target.id || !event.target.id.startsWith('searchInput')) markGeneratedPdfStale();
         });
 
         prevButton.addEventListener('click', function () {
@@ -1360,6 +1402,23 @@
         nextButton.addEventListener('click', function () {
             if (!validateCurrentStep()) return;
             showStep(currentStep + 1);
+        });
+
+        jumpReviewButton.addEventListener('click', function () {
+            if (!validateCurrentStep()) return;
+            showStep(REVIEW_STEP_INDEX);
+        });
+
+        editGeneralButton.addEventListener('click', function () {
+            showStep(GENERAL_STEP_INDEX);
+        });
+
+        editFindingsButton.addEventListener('click', function () {
+            showStep(FINDINGS_STEP_INDEX);
+        });
+
+        editDamageButton.addEventListener('click', function () {
+            showStep(DAMAGE_STEP_INDEX);
         });
 
         restoreGeneralDefaults();

@@ -1,16 +1,16 @@
 {
-  "generatedAt": "2026-06-08T11:56:38.262Z",
+  "generatedAt": "2026-06-09T09:52:05.906Z",
   "source": "google-drive",
   "rootFolderId": "1vvM9T-BB61oNrAJwcjOxvn9XFld4yVho",
   "rootFolderUrl": "https://drive.google.com/drive/folders/1vvM9T-BB61oNrAJwcjOxvn9XFld4yVho?usp=sharing",
   "stats": {
-    "files": 544,
-    "folders": 119,
+    "files": 534,
+    "folders": 118,
     "skipped": 1,
     "replacedWordFiles": 0,
-    "sizeBytes": 2189758654,
+    "sizeBytes": 2165393975,
     "byExtension": {
-      ".pdf": 213,
+      ".pdf": 203,
       ".zip": 28,
       ".docx": 211,
       ".doc": 85,
@@ -18,150 +18,13 @@
       ".jpg": 2,
       ".rar": 1
     },
-    "sizeLabel": "2.04 GB"
+    "sizeLabel": "2.02 GB"
   },
   "root": {
     "type": "folder",
     "name": "Legislatie",
     "path": "",
     "children": [
-      {
-        "type": "folder",
-        "name": "SEISM",
-        "path": "SEISM",
-        "children": [
-          {
-            "type": "file",
-            "id": "1RU32m9zP5pBNy6EtZjRa7yikg7i3cI5O",
-            "name": "CN Raspuns Post Seism 2021 - ed. 2.pdf",
-            "extension": ".pdf",
-            "kind": "pdf",
-            "sizeBytes": 5867257,
-            "sizeLabel": "5.6 MB",
-            "path": "SEISM/CN Raspuns Post Seism 2021 - ed. 2.pdf",
-            "url": "https://drive.google.com/file/d/1RU32m9zP5pBNy6EtZjRa7yikg7i3cI5O/preview",
-            "downloadUrl": "https://drive.google.com/uc?export=download&id=1RU32m9zP5pBNy6EtZjRa7yikg7i3cI5O",
-            "updatedAt": "2026-06-08T08:44:44.000Z"
-          },
-          {
-            "type": "file",
-            "id": "1CM2G2W-g9m-2PPxzYsT95bL01vGFUy_8",
-            "name": "ConceptiaNationalaDeRaspunsPostSeism.pdf",
-            "extension": ".pdf",
-            "kind": "pdf",
-            "sizeBytes": 4417791,
-            "sizeLabel": "4.2 MB",
-            "path": "SEISM/ConceptiaNationalaDeRaspunsPostSeism.pdf",
-            "url": "https://drive.google.com/file/d/1CM2G2W-g9m-2PPxzYsT95bL01vGFUy_8/preview",
-            "downloadUrl": "https://drive.google.com/uc?export=download&id=1CM2G2W-g9m-2PPxzYsT95bL01vGFUy_8",
-            "updatedAt": "2026-06-08T08:44:44.000Z"
-          },
-          {
-            "type": "file",
-            "id": "1uKRMl1_VvqOZs5BcVb1Ic6LGvkTM7Peq",
-            "name": "HG 557 din 2016_Mg tipurilor de risc.pdf",
-            "extension": ".pdf",
-            "kind": "pdf",
-            "sizeBytes": 467382,
-            "sizeLabel": "456.4 KB",
-            "path": "SEISM/HG 557 din 2016_Mg tipurilor de risc.pdf",
-            "url": "https://drive.google.com/file/d/1uKRMl1_VvqOZs5BcVb1Ic6LGvkTM7Peq/preview",
-            "downloadUrl": "https://drive.google.com/uc?export=download&id=1uKRMl1_VvqOZs5BcVb1Ic6LGvkTM7Peq",
-            "updatedAt": "2026-06-08T08:44:44.000Z"
-          },
-          {
-            "type": "file",
-            "id": "16eJb_4q3-Y_VF6OMnemL3V_RRmX-0P4E",
-            "name": "Modul specializat  judetean 2025- Conceptie Nationala SEISM.pdf",
-            "extension": ".pdf",
-            "kind": "pdf",
-            "sizeBytes": 2890583,
-            "sizeLabel": "2.8 MB",
-            "path": "SEISM/Modul specializat  judetean 2025- Conceptie Nationala SEISM.pdf",
-            "url": "https://drive.google.com/file/d/16eJb_4q3-Y_VF6OMnemL3V_RRmX-0P4E/preview",
-            "downloadUrl": "https://drive.google.com/uc?export=download&id=16eJb_4q3-Y_VF6OMnemL3V_RRmX-0P4E",
-            "updatedAt": "2026-06-08T08:44:44.000Z"
-          },
-          {
-            "type": "file",
-            "id": "11_klfErVh9b72Ub4ATCE4HMn3cNSShGN",
-            "name": "Modul-specializat-Ex national Seism-2025.pdf",
-            "extension": ".pdf",
-            "kind": "pdf",
-            "sizeBytes": 333828,
-            "sizeLabel": "326.0 KB",
-            "path": "SEISM/Modul-specializat-Ex national Seism-2025.pdf",
-            "url": "https://drive.google.com/file/d/11_klfErVh9b72Ub4ATCE4HMn3cNSShGN/preview",
-            "downloadUrl": "https://drive.google.com/uc?export=download&id=11_klfErVh9b72Ub4ATCE4HMn3cNSShGN",
-            "updatedAt": "2026-06-08T08:44:44.000Z"
-          },
-          {
-            "type": "file",
-            "id": "1qJDBlD16-tJz_YU_WVO2l76OaCZmviFh",
-            "name": "Plan_Judetean_de_acțiune_post_seism_2022-GabiGatej.pdf",
-            "extension": ".pdf",
-            "kind": "pdf",
-            "sizeBytes": 2121048,
-            "sizeLabel": "2.0 MB",
-            "path": "SEISM/Plan_Judetean_de_acțiune_post_seism_2022-GabiGatej.pdf",
-            "url": "https://drive.google.com/file/d/1qJDBlD16-tJz_YU_WVO2l76OaCZmviFh/preview",
-            "downloadUrl": "https://drive.google.com/uc?export=download&id=1qJDBlD16-tJz_YU_WVO2l76OaCZmviFh",
-            "updatedAt": "2026-06-08T08:44:44.000Z"
-          },
-          {
-            "type": "file",
-            "id": "1MOYxjXBxKCMNGth-l5xg63RRrd5rLzoM",
-            "name": "PS - MAI - DGMO - 115 - SEISM MAJOR.pdf",
-            "extension": ".pdf",
-            "kind": "pdf",
-            "sizeBytes": 1355203,
-            "sizeLabel": "1.3 MB",
-            "path": "SEISM/PS - MAI - DGMO - 115 - SEISM MAJOR.pdf",
-            "url": "https://drive.google.com/file/d/1MOYxjXBxKCMNGth-l5xg63RRrd5rLzoM/preview",
-            "downloadUrl": "https://drive.google.com/uc?export=download&id=1MOYxjXBxKCMNGth-l5xg63RRrd5rLzoM",
-            "updatedAt": "2026-06-08T08:44:44.000Z"
-          },
-          {
-            "type": "file",
-            "id": "1HebMh6TzLL4pqEWEZHNlVKLMA78rAFeq",
-            "name": "PS-10-CON_cutremure puternice.pdf",
-            "extension": ".pdf",
-            "kind": "pdf",
-            "sizeBytes": 742614,
-            "sizeLabel": "725.2 KB",
-            "path": "SEISM/PS-10-CON_cutremure puternice.pdf",
-            "url": "https://drive.google.com/file/d/1HebMh6TzLL4pqEWEZHNlVKLMA78rAFeq/preview",
-            "downloadUrl": "https://drive.google.com/uc?export=download&id=1HebMh6TzLL4pqEWEZHNlVKLMA78rAFeq",
-            "updatedAt": "2026-06-08T08:44:44.000Z"
-          },
-          {
-            "type": "file",
-            "id": "1AQo09gn5kBpzx_Dkrsuz34Idi3e1lOo0",
-            "name": "regulamentul-privind-gestionarea-situatiilor-de-urgenta-generate-de-cutremur-din-20092023.pdf",
-            "extension": ".pdf",
-            "kind": "pdf",
-            "sizeBytes": 902487,
-            "sizeLabel": "881.3 KB",
-            "path": "SEISM/regulamentul-privind-gestionarea-situatiilor-de-urgenta-generate-de-cutremur-din-20092023.pdf",
-            "url": "https://drive.google.com/file/d/1AQo09gn5kBpzx_Dkrsuz34Idi3e1lOo0/preview",
-            "downloadUrl": "https://drive.google.com/uc?export=download&id=1AQo09gn5kBpzx_Dkrsuz34Idi3e1lOo0",
-            "updatedAt": "2026-06-08T08:44:44.000Z"
-          },
-          {
-            "type": "file",
-            "id": "1nop6SnUNrBC8RM3SKbodRj2dUd1HGTCp",
-            "name": "Strategia națională de reducere a riscului seismic.pdf",
-            "extension": ".pdf",
-            "kind": "pdf",
-            "sizeBytes": 5266486,
-            "sizeLabel": "5.0 MB",
-            "path": "SEISM/Strategia națională de reducere a riscului seismic.pdf",
-            "url": "https://drive.google.com/file/d/1nop6SnUNrBC8RM3SKbodRj2dUd1HGTCp/preview",
-            "downloadUrl": "https://drive.google.com/uc?export=download&id=1nop6SnUNrBC8RM3SKbodRj2dUd1HGTCp",
-            "updatedAt": "2026-06-08T08:44:44.000Z"
-          }
-        ]
-      },
       {
         "type": "folder",
         "name": "TIPURI DE RISC -  LEGISLATIE",

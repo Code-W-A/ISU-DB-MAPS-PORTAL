@@ -359,6 +359,28 @@ button:hover {
     background: #1e40af;
 }
 
+.post-generation-actions {
+    margin-top: 12px;
+    padding: 12px;
+    border: 1px solid #bbf7d0;
+    border-radius: 10px;
+    background: #f0fdf4;
+}
+
+.post-generation-actions p {
+    margin: 0 0 10px;
+    color: #14532d;
+    font-size: 14px;
+    font-weight: 700;
+    line-height: 1.45;
+}
+
+.post-generation-grid {
+    display: grid;
+    grid-template-columns: repeat(auto-fit, minmax(170px, 1fr));
+    gap: 8px;
+}
+
 .cause-step-section {
     margin-top: 8px;
 }

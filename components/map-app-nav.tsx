@@ -7,6 +7,7 @@ import {
   MdAccountBalance,
   MdDashboard,
   MdHealthAndSafety,
+  MdLaunch,
   MdLogout,
   MdMap,
   MdMenuBook,
@@ -32,6 +33,28 @@ function NavItemLink({
       >
         {children}
       </Link>
+    </Button>
+  )
+}
+
+function NavItemAnchor({
+  className,
+  children,
+  onClose,
+  onClick,
+  ...rest
+}: React.ComponentProps<"a"> & { onClose: () => void }) {
+  return (
+    <Button variant="ghost" className={cn("h-11 w-full justify-start gap-3 px-3", className)} asChild>
+      <a
+        {...rest}
+        onClick={(event) => {
+          onClick?.(event)
+          onClose()
+        }}
+      >
+        {children}
+      </a>
     </Button>
   )
 }
@@ -81,6 +104,15 @@ function MapAppNavListMapMode({
           <span>Legislatie</span>
         </NavItemLink>
       )}
+      <NavItemAnchor
+        href="https://isudb-maps.vercel.app/firerescue"
+        target="_blank"
+        rel="noopener noreferrer"
+        onClose={onClose}
+      >
+        <MdLaunch size={22} className="shrink-0" />
+        <span>Firerescue</span>
+      </NavItemAnchor>
       {isPrevention && (
         <NavItemLink href="/" onClose={onClose}>
           <MdMap size={22} className="shrink-0" />
@@ -156,6 +188,15 @@ function MapAppNavListToolMode({ onClose, ...props }: NavListFields) {
           <span>Legislatie</span>
         </NavItemLink>
       )}
+      <NavItemAnchor
+        href="https://isudb-maps.vercel.app/firerescue"
+        target="_blank"
+        rel="noopener noreferrer"
+        onClose={onClose}
+      >
+        <MdLaunch size={22} className="shrink-0" />
+        <span>Firerescue</span>
+      </NavItemAnchor>
       {props.isAdmin && props.onNavigateToDashboard && (
         <Button
           type="button"
