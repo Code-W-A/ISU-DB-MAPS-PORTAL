@@ -1,19 +1,11 @@
 import type { Metadata } from "next"
-import { IndrumatorCauseWizard } from "@/components/indrumator/indrumator-cause-wizard"
-import { ToolPageShell } from "@/components/tool-page-shell"
-import { getIndrumatorCauseSections } from "@/lib/indrumator-data"
+import { IndrumatorLegacyFrame } from "@/components/indrumator/indrumator-legacy-frame"
 
 export const metadata: Metadata = {
-  title: "Îndrumător",
-  description: "Îndrumător SMISU - ISU DB",
+  title: "Indrumator",
+  description: "Indrumator SMISU - ISU DB",
 }
 
-export default async function IndrumatorPage() {
-  const sections = await getIndrumatorCauseSections()
-
-  return (
-    <ToolPageShell title="Îndrumător SMISU" tool="indrumator" contentClassName="overflow-hidden">
-      <IndrumatorCauseWizard sections={sections} />
-    </ToolPageShell>
-  )
+export default function IndrumatorPage() {
+  return <IndrumatorLegacyFrame />
 }

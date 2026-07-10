@@ -238,7 +238,7 @@ export function LegislatieTab() {
   useEffect(() => {
     let isMounted = true
 
-    fetch("/legislatie-manifest.json", { cache: "no-store" })
+    fetch("/api/legislatie/manifest", { cache: "no-store" })
       .then((response) => {
         if (!response.ok) throw new Error("Manifestul legislatie nu a fost gasit.")
         return response.json() as Promise<LegislatieManifest>
@@ -291,7 +291,7 @@ export function LegislatieTab() {
         <Card>
           <CardContent className="space-y-3 p-6">
             <p className="text-sm text-red-700">{error ?? "Manifestul legislatie nu este disponibil."}</p>
-            <p className="text-sm text-gray-600">Ruleaza `npm run legislatie:import-drive` sau `npm run legislatie:manifest`, apoi reporneste aplicatia daca este nevoie.</p>
+            <p className="text-sm text-gray-600">Sincronizeaza legislatia din Dashboard &gt; Setari sau ruleaza `npm run legislatie:import-drive` pentru fallback-ul static.</p>
           </CardContent>
         </Card>
       </div>

@@ -1,4 +1,4 @@
-import type { Hydrant } from "@/types/hydrant"
+import type { Hydrant } from "./hydrant"
 
 export type HydrantReportStatus = "în așteptare" | "aprobat" | "respins"
 export type HydrantReportType = "nou" | "modificare"

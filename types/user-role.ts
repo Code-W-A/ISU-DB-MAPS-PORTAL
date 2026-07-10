@@ -1,4 +1,4 @@
-import type { PreventionZonesAccessLevel } from "@/types/prevention-zone"
+import type { PreventionZonesAccessLevel } from "./prevention-zone"
 
 export interface UserRole {
   uid: string

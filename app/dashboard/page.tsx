@@ -19,6 +19,7 @@ import { DataImport } from "@/components/dashboard/data-import"
 import { DataSourceToggle } from "@/components/dashboard/data-source-toggle"
 import { HydrantReportsTable } from "@/components/dashboard/hydrant-reports-table"
 import { HydrantsTable } from "@/components/dashboard/hydrants-table"
+import { LegislatieSyncControl } from "@/components/dashboard/legislatie-sync-control"
 import { PreventionZonesPanel } from "@/components/dashboard/prevention-zones-panel"
 import { PrimariiTable } from "@/components/dashboard/primarii-table"
 import { SevesoTable } from "@/components/dashboard/seveso-table"
@@ -286,6 +287,7 @@ export default function DashboardPage() {
 
         {dashboardTabs.includes("settings") && (
           <TabsContent value="settings" className="space-y-6">
+            <LegislatieSyncControl />
             <DataSourceToggle />
           </TabsContent>
         )}
