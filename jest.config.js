@@ -11,6 +11,7 @@ const customJestConfig = {
   testEnvironment: "jest-environment-jsdom",
   moduleNameMapper: {
     "^@/(.*)$": "<rootDir>/$1",
+    "^@isu-shared/(.*)$": "<rootDir>/shared/$1",
   },
   testMatch: ["**/__tests__/**/*.test.[jt]s?(x)"],
   collectCoverageFrom: ["components/**/*.{js,jsx,ts,tsx}", "lib/**/*.{js,jsx,ts,tsx}", "!**/node_modules/**"],

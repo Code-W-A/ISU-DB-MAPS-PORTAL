@@ -17,6 +17,13 @@
             box-shadow: 0 2px 5px rgba(0, 0, 0, 0.2);
             transition: all 0.3s ease; /* Optional: Smooth transition */
         }
+        .field-limit {
+            display: block;
+            margin-top: 4px;
+            color: #667085;
+            font-size: 0.75rem;
+            text-align: right;
+        }
     </style>
 </head>
 <body>
@@ -40,7 +47,7 @@
             <div class="form-grid">
                 <label>
                     Inspectorat
-                    <input type="text" id="inspectorat" placeholder="ISU..." autocomplete="organization">
+                    <input type="text" id="inspectorat" value="Inspectoratul pentru Situații de Urgență &quot;Basarab I&quot; al județului Dâmbovița" placeholder="Inspectoratul pentru Situații de Urgență..." autocomplete="organization" maxlength="120">
                 </label>
                 <label>
                     Subunitate *
@@ -1059,6 +1066,21 @@
 
     (function setupIrpWizard() {
         const DEFAULTS_KEY = 'irp.generalDefaults.v1';
+        const IRP_DEFAULT_INSPECTORAT = 'Inspectoratul pentru Situații de Urgență "Basarab I" al județului Dâmbovița';
+        const LEGACY_DEFAULT_INSPECTORATE = new Set(['isu dâmbovița', 'isu dambovita']);
+        const FIELD_LIMITS = {
+            inspectorat: 120, subunitate: 160, pvNumber: 40, pvDate: 10,
+            localitate: 160, locInterventie: 160, judet: 80, strada: 120,
+            numar: 30, bloc: 30, scara: 30, etaj: 30, apartament: 30,
+            eventType: 160, producedAt: 160, owner: 160, eventDetails: 160,
+            situation: 280, consequences: 500, adultVictims: 160,
+            childVictims: 160, animals: 160, affectedOwnersCount: 20,
+            rescued: 180, conditiiFavorizante: 160, sediuIsu: 160,
+            affectedProperty: 160, affectedLocality: 80, affectedCounty: 80,
+            affectedStreet: 120, affectedNumber: 30, affectedBlock: 30,
+            affectedStair: 30, affectedFloor: 30, affectedApartment: 30,
+            damageDescription: 820
+        };
         const generalFieldIds = ['inspectorat', 'subunitate', 'judet', 'sediuIsu', 'localitate'];
         const causeSections = [
             { headerId: 'togglelocul', contentId: 'loculContent', listId: 'termsList0', title: 'Locul focarului' },
@@ -1143,6 +1165,7 @@
 
         stepContainer.id = 'wizardSteps';
         form.prepend(stepContainer);
+        initializeFieldLimits();
 
         function getElement(id) {
             return document.getElementById(id);
@@ -1151,6 +1174,25 @@
         function getLabelForField(id) {
             const field = getElement(id);
             return field ? field.closest('label') : null;
+        }
+
+        function updateFieldCounter(field) {
+            const counter = getElement(`limit-${field.id}`);
+            if (counter) counter.textContent = `${field.value.length}/${field.maxLength} caractere`;
+        }
+
+        function initializeFieldLimits() {
+            Object.entries(FIELD_LIMITS).forEach(([id, limit]) => {
+                const field = getElement(id);
+                if (!field) return;
+                field.maxLength = limit;
+                const counter = document.createElement('small');
+                counter.id = `limit-${id}`;
+                counter.className = 'field-limit';
+                field.insertAdjacentElement('afterend', counter);
+                field.addEventListener('input', () => updateFieldCounter(field));
+                updateFieldCounter(field);
+            });
         }
 
         function safeRead(key) {
@@ -1177,7 +1219,10 @@
         function setFieldValues(values) {
             Object.entries(values || {}).forEach(([id, value]) => {
                 const field = getElement(id);
-                if (field) field.value = value || '';
+                if (field) {
+                    field.value = value || '';
+                    updateFieldCounter(field);
+                }
             });
         }
 
@@ -1192,7 +1237,12 @@
         }
 
         function restoreGeneralDefaults() {
-            setFieldValues(safeRead(DEFAULTS_KEY) || {});
+            const defaults = safeRead(DEFAULTS_KEY) || {};
+            const inspectorat = typeof defaults.inspectorat === 'string' ? defaults.inspectorat.trim() : '';
+            if (!inspectorat || LEGACY_DEFAULT_INSPECTORATE.has(inspectorat.toLocaleLowerCase('ro-RO'))) {
+                defaults.inspectorat = IRP_DEFAULT_INSPECTORAT;
+            }
+            setFieldValues(defaults);
         }
 
         function getCauseSection(sectionId) {
