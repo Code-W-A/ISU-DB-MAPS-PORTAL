@@ -7,6 +7,7 @@ import { getAllUsers, getPreventionZonesAccessForAuthUser, hasFullAccess } from 
 
 const emptyFlags: MapToolLinkFlags = {
   showIndrumatorLink: false,
+  showProcesVerbalLink: false,
   showAdrLink: false,
   showLegislatieLink: false,
 }

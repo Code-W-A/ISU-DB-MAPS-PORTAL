@@ -14,6 +14,7 @@ interface MobileHeaderProps {
   variant?: "default" | "prevention"
   showPreventionFullMapLink?: boolean
   showIndrumatorLink?: boolean
+  showProcesVerbalLink?: boolean
   showAdrLink?: boolean
   showLegislatieLink?: boolean
 }
@@ -25,6 +26,7 @@ export function MobileHeader({
   variant = "default",
   showPreventionFullMapLink = false,
   showIndrumatorLink = false,
+  showProcesVerbalLink = false,
   showAdrLink = false,
   showLegislatieLink = false,
 }: MobileHeaderProps) {
@@ -54,6 +56,7 @@ export function MobileHeader({
           onNavigateToDashboard={onNavigateToDashboard}
           onSignOut={onSignOut}
           showIndrumatorLink={showIndrumatorLink}
+          showProcesVerbalLink={showProcesVerbalLink}
           showAdrLink={showAdrLink}
           showLegislatieLink={showLegislatieLink}
           showPreventionFullMapLink={showPreventionFullMapLink}

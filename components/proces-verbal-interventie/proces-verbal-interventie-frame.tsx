@@ -2,11 +2,11 @@
 
 import { ToolPageShell } from "@/components/tool-page-shell"
 
-export function IndrumatorLegacyFrame() {
+export function ProcesVerbalInterventieFrame() {
   return (
-    <ToolPageShell title="Indrumator SMISU" tool="indrumator">
+    <ToolPageShell title="Proces Verbal Intervenție" tool="proces-verbal-interventie" requireToolAccess>
       <iframe
-        title="Indrumator SMISU - proces verbal si anexa 20"
+        title="Proces Verbal Intervenție - Anexa 19 și Anexa 20"
         src="/indrumator/index.html"
         className="min-h-0 h-full w-full flex-1 border-0"
       />

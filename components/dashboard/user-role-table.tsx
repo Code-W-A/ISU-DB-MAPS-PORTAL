@@ -15,6 +15,12 @@ import { useAuth } from "@/components/auth-provider"
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select"
 import { Dialog, DialogContent, DialogDescription, DialogHeader, DialogTitle } from "@/components/ui/dialog"
 import { useMobile } from "@/hooks/use-mobile"
+import {
+  MAP_TOOL_LINK_TAB_INDRUMATOR,
+  MAP_TOOL_LINK_TAB_PROCES_VERBAL,
+  expandLegacyIndrumatorTabs,
+  hasAllowedTab,
+} from "@/lib/map-tool-links"
 
 interface UserRoleTableProps {
   initialUsers: UserRole[]
@@ -30,9 +36,16 @@ const ALL_TABS = [
   { value: "settings", label: "Setări" },
   { value: "legislatie", label: "Legislație" },
   { value: "preventionZones", label: "Zone competență" },
-  { value: "indrumator", label: "Îndrumător (hartă)" },
+  { value: MAP_TOOL_LINK_TAB_PROCES_VERBAL, label: "Proces Verbal Intervenție" },
+  { value: MAP_TOOL_LINK_TAB_INDRUMATOR, label: "Îndrumător" },
   { value: "adr", label: "ADR / Substanțe periculoase" },
 ]
+
+function toggleAllowedTab(allowedTabs: string[] | undefined, tab: string, checked: boolean) {
+  const normalizedTabs = expandLegacyIndrumatorTabs(allowedTabs)
+  if (checked) return Array.from(new Set([...normalizedTabs, tab]))
+  return normalizedTabs.filter((currentTab) => currentTab !== tab)
+}
 
 const PREVENTION_ACCESS_OPTIONS: { value: PreventionZonesAccessLevel; label: string }[] = [
   { value: "none", label: "Fără acces" },
@@ -178,11 +191,12 @@ export function UserRoleTable({ initialUsers }: UserRoleTableProps) {
   }
 
   const handleTabsChange = async (uid: string, allowedTabs: string[]) => {
-    setUsers(users.map((u) => (u.uid === uid ? { ...u, allowedTabs } : u)))
+    const normalizedTabs = expandLegacyIndrumatorTabs(allowedTabs)
+    setUsers(users.map((u) => (u.uid === uid ? { ...u, allowedTabs: normalizedTabs } : u)))
     setUpdatingUser(uid)
 
     try {
-      const ok = await mergeUserRoleFields(uid, { allowedTabs })
+      const ok = await mergeUserRoleFields(uid, { allowedTabs: normalizedTabs })
       if (ok) {
         toast({
           title: "Succes",
@@ -326,17 +340,9 @@ export function UserRoleTable({ initialUsers }: UserRoleTableProps) {
                             <label key={tab.value} className="flex items-center gap-2 text-xs cursor-pointer">
                               <input
                                 type="checkbox"
-                                checked={u.allowedTabs ? u.allowedTabs.includes(tab.value) : false}
+                                checked={hasAllowedTab(u.allowedTabs, tab.value)}
                                 onChange={(e) => {
-                                  const currentTabs = u.allowedTabs || []
-                                  let newTabs: string[]
-
-                                  if (e.target.checked) {
-                                    newTabs = [...currentTabs, tab.value]
-                                  } else {
-                                    newTabs = currentTabs.filter((t) => t !== tab.value)
-                                  }
-
+                                  const newTabs = toggleAllowedTab(u.allowedTabs, tab.value, e.target.checked)
                                   void handleTabsChange(u.uid, newTabs)
                                 }}
                                 disabled={updatingUser === u.uid}
@@ -348,9 +354,9 @@ export function UserRoleTable({ initialUsers }: UserRoleTableProps) {
                         </div>
                         <div className="space-y-2 min-w-0 md:hidden">
                           <p className="text-xs text-muted-foreground">
-                            {(u.allowedTabs || []).length === 0
+                            {expandLegacyIndrumatorTabs(u.allowedTabs).length === 0
                               ? "Niciun tab"
-                              : `${(u.allowedTabs || []).length} taburi selectate`}
+                              : `${expandLegacyIndrumatorTabs(u.allowedTabs).length} taburi selectate`}
                           </p>
                           <Button
                             type="button"
@@ -366,8 +372,8 @@ export function UserRoleTable({ initialUsers }: UserRoleTableProps) {
                       </>
                     ) : (
                       <div className="flex flex-wrap gap-1">
-                        {(u.allowedTabs || []).length > 0 ? (
-                          u.allowedTabs?.map(tab => (
+                        {expandLegacyIndrumatorTabs(u.allowedTabs).length > 0 ? (
+                          expandLegacyIndrumatorTabs(u.allowedTabs).map(tab => (
                             <span key={tab} className="bg-blue-100 text-blue-800 text-xs px-2 py-1 rounded-full">
                               {ALL_TABS.find(t => t.value === tab)?.label || tab}
                             </span>
@@ -466,12 +472,9 @@ export function UserRoleTable({ initialUsers }: UserRoleTableProps) {
                             <label key={tab.value} className="flex min-h-[44px] items-center gap-2 text-sm cursor-pointer">
                               <input
                                 type="checkbox"
-                                checked={tabUser.allowedTabs ? tabUser.allowedTabs.includes(tab.value) : false}
+                                checked={hasAllowedTab(tabUser.allowedTabs, tab.value)}
                                 onChange={(e) => {
-                                  const currentTabs = tabUser.allowedTabs || []
-                                  const newTabs = e.target.checked
-                                    ? [...currentTabs, tab.value]
-                                    : currentTabs.filter((t) => t !== tab.value)
+                                  const newTabs = toggleAllowedTab(tabUser.allowedTabs, tab.value, e.target.checked)
                                   void handleTabsChange(tabUser.uid, newTabs)
                                 }}
                                 disabled={updatingUser === tabUser.uid}

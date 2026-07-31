@@ -11,6 +11,7 @@ import {
   MdLogout,
   MdMap,
   MdMenuBook,
+  MdDescription,
   MdScience,
 } from "react-icons/md"
 import { cn } from "@/lib/utils"
@@ -61,13 +62,14 @@ function NavItemAnchor({
 
 export type MapAppNavContext =
   | { type: "map"; mapVariant: "default" | "prevention" }
-  | { type: "tool"; tool: "indrumator" | "adr" | "legislatie" }
+  | { type: "tool"; tool: "indrumator" | "proces-verbal-interventie" | "adr" | "legislatie" }
 
 export interface MapAppNavListBaseProps {
   isAdmin: boolean
   onNavigateToDashboard?: () => void
   onSignOut: () => void
   showIndrumatorLink: boolean
+  showProcesVerbalLink: boolean
   showAdrLink: boolean
   showLegislatieLink: boolean
   showPreventionFullMapLink: boolean
@@ -86,10 +88,16 @@ function MapAppNavListMapMode({
 
   return (
     <>
+      {props.showProcesVerbalLink && (
+        <NavItemLink href="/proces-verbal-interventie" onClose={onClose}>
+          <MdDescription size={22} className="shrink-0" />
+          <span>Proces Verbal Intervenție</span>
+        </NavItemLink>
+      )}
       {props.showIndrumatorLink && (
         <NavItemLink href="/indrumator" onClose={onClose}>
           <MdMenuBook size={22} className="shrink-0" />
-          <span>Indrumator</span>
+          <span>Îndrumător</span>
         </NavItemLink>
       )}
       {props.showAdrLink && (
@@ -173,7 +181,13 @@ function MapAppNavListToolMode({ onClose, ...props }: NavListFields) {
       {props.showIndrumatorLink && (
         <NavItemLink href="/indrumator" onClose={onClose}>
           <MdMenuBook size={22} className="shrink-0" />
-          <span>Indrumator</span>
+          <span>Îndrumător</span>
+        </NavItemLink>
+      )}
+      {props.showProcesVerbalLink && (
+        <NavItemLink href="/proces-verbal-interventie" onClose={onClose}>
+          <MdDescription size={22} className="shrink-0" />
+          <span>Proces Verbal Intervenție</span>
         </NavItemLink>
       )}
       {props.showAdrLink && (

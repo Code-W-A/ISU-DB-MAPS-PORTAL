@@ -48,6 +48,7 @@ export function MapContainer() {
         isAdmin={nav.hasDashboardAccess}
         showPreventionFullMapLink={nav.hasPreventionZonesAccess}
         showIndrumatorLink={nav.mapToolLinks.showIndrumatorLink}
+        showProcesVerbalLink={nav.mapToolLinks.showProcesVerbalLink}
         showAdrLink={nav.mapToolLinks.showAdrLink}
         showLegislatieLink={nav.mapToolLinks.showLegislatieLink}
       >

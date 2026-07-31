@@ -20,6 +20,7 @@ interface GoogleMapsLoaderProps {
   variant?: "default" | "prevention"
   showPreventionFullMapLink?: boolean
   showIndrumatorLink?: boolean
+  showProcesVerbalLink?: boolean
   showAdrLink?: boolean
   showLegislatieLink?: boolean
 }
@@ -32,6 +33,7 @@ export function GoogleMapsLoader({
   variant = "default",
   showPreventionFullMapLink = false,
   showIndrumatorLink = false,
+  showProcesVerbalLink = false,
   showAdrLink = false,
   showLegislatieLink = false,
 }: GoogleMapsLoaderProps) {
@@ -231,6 +233,7 @@ export function GoogleMapsLoader({
             variant={variant}
             showPreventionFullMapLink={showPreventionFullMapLink}
             showIndrumatorLink={showIndrumatorLink}
+            showProcesVerbalLink={showProcesVerbalLink}
             showAdrLink={showAdrLink}
             showLegislatieLink={showLegislatieLink}
           />
@@ -261,6 +264,7 @@ export function GoogleMapsLoader({
                   onNavigateToDashboard={handleNavigateToDashboard}
                   onSignOut={onSignOut}
                   showIndrumatorLink={showIndrumatorLink}
+                  showProcesVerbalLink={showProcesVerbalLink}
                   showAdrLink={showAdrLink}
                   showLegislatieLink={showLegislatieLink}
                   showPreventionFullMapLink={showPreventionFullMapLink}

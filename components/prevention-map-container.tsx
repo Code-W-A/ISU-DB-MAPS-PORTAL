@@ -33,6 +33,7 @@ function PreventionMapGml({
         userEmail={userEmail}
         isAdmin={nav.hasDashboardAccess}
         showIndrumatorLink={nav.mapToolLinks.showIndrumatorLink}
+        showProcesVerbalLink={nav.mapToolLinks.showProcesVerbalLink}
         showAdrLink={nav.mapToolLinks.showAdrLink}
         showLegislatieLink={nav.mapToolLinks.showLegislatieLink}
       >
