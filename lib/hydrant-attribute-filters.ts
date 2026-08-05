@@ -24,8 +24,7 @@ export function readStoredHydrantAttributeFilters(): HydrantAttributeFilters {
     const o = JSON.parse(raw) as Partial<Record<keyof HydrantAttributeFilters, unknown>>
     return {
       functional: typeof o.functional === "boolean" ? o.functional : DEFAULT_HYDRANT_ATTRIBUTE_FILTERS.functional,
-      nonFunctional:
-        typeof o.nonFunctional === "boolean" ? o.nonFunctional : DEFAULT_HYDRANT_ATTRIBUTE_FILTERS.nonFunctional,
+      nonFunctional: typeof o.nonFunctional === "boolean" ? o.nonFunctional : DEFAULT_HYDRANT_ATTRIBUTE_FILTERS.nonFunctional,
       suprateran: typeof o.suprateran === "boolean" ? o.suprateran : DEFAULT_HYDRANT_ATTRIBUTE_FILTERS.suprateran,
       subteran: typeof o.subteran === "boolean" ? o.subteran : DEFAULT_HYDRANT_ATTRIBUTE_FILTERS.subteran,
     }
@@ -43,26 +42,22 @@ export function writeStoredHydrantAttributeFilters(filters: HydrantAttributeFilt
   }
 }
 
-export function hydrantMatchesAttributeFilters(hydrant: Hydrant, f: HydrantAttributeFilters): boolean {
+export function hydrantMatchesAttributeFilters(hydrant: Hydrant, filters: HydrantAttributeFilters): boolean {
   const stare = hydrant["Stare hidrant"]
-  const isFunc = stare?.Funcțional === "Da"
-  const isNfunc = stare?.Nefuncțional === "Da"
-
-  let passesStare: boolean
-  if (isFunc && isNfunc) passesStare = f.functional || f.nonFunctional
-  else if (isFunc) passesStare = f.functional
-  else if (isNfunc) passesStare = f.nonFunctional
-  else passesStare = f.functional || f.nonFunctional
+  const isFunctional = stare?.Funcțional === "Da"
+  const isNonFunctional = stare?.Nefuncțional === "Da"
+  const passesState =
+    (isFunctional && filters.functional) ||
+    (isNonFunctional && filters.nonFunctional) ||
+    (!isFunctional && !isNonFunctional && (filters.functional || filters.nonFunctional))
 
   const tip = hydrant.TipHidrant
-  const isSup = tip?.Suprateran === "Da"
-  const isSub = tip?.Subteran === "Da"
+  const isAboveGround = tip?.Suprateran === "Da"
+  const isUnderground = tip?.Subteran === "Da"
+  const passesType =
+    (isAboveGround && filters.suprateran) ||
+    (isUnderground && filters.subteran) ||
+    (!isAboveGround && !isUnderground && (filters.suprateran || filters.subteran))
 
-  let passesTip: boolean
-  if (isSup && isSub) passesTip = f.suprateran || f.subteran
-  else if (isSup) passesTip = f.suprateran
-  else if (isSub) passesTip = f.subteran
-  else passesTip = f.suprateran || f.subteran
-
-  return passesStare && passesTip
+  return passesState && passesType
 }
