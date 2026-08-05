@@ -7,7 +7,7 @@ import { Alert, AlertDescription, AlertTitle } from "@/components/ui/alert"
 import { Progress } from "@/components/ui/progress"
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs"
 import { loadHydrantsFromGit } from "@/lib/hydrant-service"
-import { loadPrimariiData } from "@/lib/primarii-service"
+import { loadPrimariiFromGit } from "@/lib/primarii-service"
 import { useAuth } from "@/components/auth-provider"
 import {
   importHydrantsToFirestore,
@@ -102,7 +102,9 @@ export function DataImport() {
     try {
       // Încărcăm primăriile din Git
       setProgress(30)
-      const primarii = await loadPrimariiData()
+      // Importul trebuie să preia întotdeauna versiunea actuală din Git,
+      // fără să folosească snapshot-ul sau cache-ul local.
+      const primarii = await loadPrimariiFromGit()
 
       // Importăm primăriile în Firestore
       setProgress(50)

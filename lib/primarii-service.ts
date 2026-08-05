@@ -5,7 +5,7 @@ import { loadMapLayerSnapshot } from "@/lib/map-snapshot-service"
 
 // URL-ul GitHub pentru datele primăriilor
 const PRIMARII_DATA_URL =
-  "https://raw.githubusercontent.com/RaduPopescu95/isudb_maps_data/refs/heads/main/newprimarii.json"
+  "https://raw.githubusercontent.com/Code-W-A/isudb_maps_data/refs/heads/main/newprimarii_actualizat.json"
 const PRIMARII_CACHE_KEY = "primariiData"
 const PRIMARII_CACHE_TIMESTAMP_KEY = "primariiTimestamp"
 

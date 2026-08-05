@@ -24,7 +24,12 @@ export async function importPrimariiToFirestore(primarii: Primarie[]): Promise<{
 
       // Generăm un ID unic bazat pe numele primăriei sau coordonate
       const primarieId = primarie.numePrimarie
-        ? `${primarie.numePrimarie.replace(/\s+/g, "_").toLowerCase()}_${Date.now()}`
+        ? primarie.numePrimarie
+            .normalize("NFD")
+            .replace(/[\u0300-\u036f]/g, "")
+            .replace(/[^a-zA-Z0-9]+/g, "_")
+            .replace(/^_|_$/g, "")
+            .toLowerCase()
         : `primarie_${primarie.coordinates.latitude}_${primarie.coordinates.longitude}`
 
       // Creăm o copie a primăriei cu ID-ul adăugat

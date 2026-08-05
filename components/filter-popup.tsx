@@ -1,14 +1,13 @@
 "use client"
 
-import { useState } from "react"
+import { useState, type ReactNode } from "react"
 import { Button } from "@/components/ui/button"
-import { Checkbox } from "@/components/ui/checkbox"
+import { Dialog, DialogContent, DialogDescription, DialogFooter, DialogHeader, DialogTitle } from "@/components/ui/dialog"
 import { Label } from "@/components/ui/label"
-import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card"
-import { MdFilterList, MdFireHydrantAlt, MdAccountBalance, MdFireTruck, MdWarning, MdClose } from "react-icons/md"
 import { Switch } from "@/components/ui/switch"
-import type { HydrantAttributeFilters } from "@/lib/hydrant-attribute-filters"
 import { HydrantAttributeFilterControls } from "@/components/hydrant-attribute-filter-controls"
+import type { HydrantAttributeFilters } from "@/lib/hydrant-attribute-filters"
+import { MdAccountBalance, MdFilterList, MdFireHydrantAlt, MdFireTruck, MdWarning } from "react-icons/md"
 
 interface FilterPopupProps {
   showHydrants: boolean
@@ -42,88 +41,129 @@ export function FilterPopup({
   const [isOpen, setIsOpen] = useState(false)
 
   return (
-    <div className="relative">
+    <Dialog open={isOpen} onOpenChange={setIsOpen}>
       <Button
         variant="secondary"
         size="icon"
         className="rounded-full shadow-md"
-        onClick={() => setIsOpen(!isOpen)}
+        onClick={() => setIsOpen(true)}
         title="Filtrează markeri"
+        type="button"
       >
         <MdFilterList size={20} />
       </Button>
 
-      {isOpen && (
-        <Card className="absolute top-12 left-0 z-50 w-72 max-h-[min(70vh,28rem)] overflow-y-auto shadow-lg">
-          <CardHeader className="p-3 pb-0 flex flex-row justify-between items-center">
-            <CardTitle className="text-sm">Filtrează markeri</CardTitle>
-            <Button variant="ghost" size="icon" className="h-6 w-6" onClick={() => setIsOpen(false)}>
-              <MdClose size={16} />
-            </Button>
-          </CardHeader>
-          <CardContent className="p-3 space-y-3">
-            <div className="flex items-center space-x-2">
-              <Checkbox id="show-hydrants" checked={showHydrants} onCheckedChange={toggleHydrants} />
-              <div className="flex items-center gap-2">
-                <MdFireHydrantAlt size={16} className="text-blue-600" />
-                <Label htmlFor="show-hydrants" className="text-sm">
-                  Hidranți
-                </Label>
-              </div>
-            </div>
+      <DialogContent className="max-w-xl gap-0 overflow-hidden p-0">
+        <DialogHeader className="border-b px-6 py-5 pr-12">
+          <DialogTitle>Filtrează markeri</DialogTitle>
+          <DialogDescription>Alege straturile și tipurile de hidranți afișate pe hartă.</DialogDescription>
+        </DialogHeader>
 
-            {showHydrants && (
-              <HydrantAttributeFilterControls
-                filters={hydrantAttrFilters}
-                onChange={onHydrantAttrFiltersChange}
-                variant="checkbox"
-              />
-            )}
-
-            <div className="flex items-center space-x-2">
-              <Checkbox id="show-primarii" checked={showPrimarii} onCheckedChange={togglePrimarii} />
-              <div className="flex items-center gap-2">
-                <MdAccountBalance size={16} className="text-amber-600" />
-                <Label htmlFor="show-primarii" className="text-sm">
-                  Primării
-                </Label>
-              </div>
-            </div>
-
-            <div className="flex items-center space-x-2">
-              <Checkbox id="show-subunitati" checked={showSubunitati} onCheckedChange={toggleSubunitati} />
-              <div className="flex items-center gap-2">
-                <MdFireTruck size={16} className="text-red-600" />
-                <Label htmlFor="show-subunitati" className="text-sm">
-                  Subunități ISU
-                </Label>
-              </div>
-            </div>
-
-            <div className="flex items-center space-x-2">
-              <Checkbox id="show-seveso" checked={showSeveso} onCheckedChange={toggleSeveso} />
-              <div className="flex items-center gap-2">
-                <MdWarning size={16} className="text-yellow-500" />
-                <Label htmlFor="show-seveso" className="text-sm">
-                  Obiective SEVESO
-                </Label>
-              </div>
-            </div>
-            {showSeveso && toggleSevesoCircles && (
-              <div className="ml-6 mt-1">
-                <div className="flex items-center justify-between">
-                  <span className="text-sm">Afișează toate zonele SEVESO</span>
-                  <Switch
-                    checked={showSevesoCircles}
-                    onCheckedChange={toggleSevesoCircles}
-                    aria-label="Toggle SEVESO impact zones"
-                  />
+        <div className="max-h-[65vh] overflow-y-auto p-6">
+          <div className="overflow-hidden rounded-xl border bg-card shadow-sm">
+            <div className="flex items-center justify-between gap-3 border-b px-4 py-3.5">
+              <div className="flex min-w-0 items-center gap-3">
+                <div className="flex h-10 w-10 shrink-0 items-center justify-center rounded-lg bg-blue-500/15">
+                  <MdFireHydrantAlt className="text-blue-600" size={22} />
+                </div>
+                <div>
+                  <p className="text-sm font-semibold leading-tight">Hidranți</p>
+                  <p className="text-xs text-muted-foreground">Puncte pe hartă</p>
                 </div>
               </div>
+              <Switch
+                id="desktop-show-hydrants"
+                aria-label="Hidranți"
+                checked={showHydrants}
+                onCheckedChange={toggleHydrants}
+              />
+            </div>
+            {showHydrants && (
+              <div className="border-b px-4 py-3">
+                <HydrantAttributeFilterControls
+                  filters={hydrantAttrFilters}
+                  onChange={onHydrantAttrFiltersChange}
+                  variant="switch"
+                />
+              </div>
             )}
-          </CardContent>
-        </Card>
-      )}
+
+            <LayerRow
+              id="desktop-show-primarii"
+              title="Primării"
+              subtitle="Sedii administrative"
+              checked={showPrimarii}
+              onCheckedChange={togglePrimarii}
+              icon={<MdAccountBalance className="text-amber-600" size={22} />}
+              iconClassName="bg-amber-500/15"
+            />
+            <LayerRow
+              id="desktop-show-subunitati"
+              title="Subunități ISU"
+              subtitle="Stații și detașamente"
+              checked={showSubunitati}
+              onCheckedChange={toggleSubunitati}
+              icon={<MdFireTruck className="text-red-600" size={22} />}
+              iconClassName="bg-red-500/15"
+            />
+            <LayerRow
+              id="desktop-show-seveso"
+              title="Obiective SEVESO"
+              subtitle="Instalații reglementate"
+              checked={showSeveso}
+              onCheckedChange={toggleSeveso}
+              icon={<MdWarning className="text-yellow-600" size={22} />}
+              iconClassName="bg-yellow-500/15"
+              last={!showSeveso}
+            />
+
+            {showSeveso && toggleSevesoCircles && (
+              <div className="flex items-center justify-between gap-3 border-t bg-muted/30 px-4 py-3 pl-6">
+                <Label htmlFor="desktop-seveso-zones" className="text-sm font-medium leading-tight">
+                  Zone de impact (cercuri)
+                </Label>
+                <Switch
+                  id="desktop-seveso-zones"
+                  checked={showSevesoCircles}
+                  onCheckedChange={toggleSevesoCircles}
+                />
+              </div>
+            )}
+          </div>
+        </div>
+
+        <DialogFooter className="border-t px-6 py-4 sm:justify-end">
+          <Button variant="outline" onClick={() => setIsOpen(false)} type="button">
+            Închide
+          </Button>
+        </DialogFooter>
+      </DialogContent>
+    </Dialog>
+  )
+}
+
+type LayerRowProps = {
+  id: string
+  title: string
+  subtitle: string
+  checked: boolean
+  onCheckedChange: () => void
+  icon: ReactNode
+  iconClassName: string
+  last?: boolean
+}
+
+function LayerRow({ id, title, subtitle, checked, onCheckedChange, icon, iconClassName, last = false }: LayerRowProps) {
+  return (
+    <div className={`flex items-center justify-between gap-3 px-4 py-3.5 ${last ? "" : "border-b"}`}>
+      <div className="flex min-w-0 items-center gap-3">
+        <div className={`flex h-10 w-10 shrink-0 items-center justify-center rounded-lg ${iconClassName}`}>{icon}</div>
+        <div>
+          <p className="text-sm font-semibold leading-tight">{title}</p>
+          <p className="text-xs text-muted-foreground">{subtitle}</p>
+        </div>
+      </div>
+      <Switch id={id} aria-label={title} checked={checked} onCheckedChange={onCheckedChange} />
     </div>
   )
 }

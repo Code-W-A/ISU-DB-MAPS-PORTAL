@@ -600,7 +600,12 @@ export function Map({ apiKey = "", hasAccess = false, isAdmin = false }: MapProp
 
   // Update visible hydrants based on map bounds and zoom - with throttling
   useEffect(() => {
-    if (!mapBounds || hydrantPointsFiltered.length === 0 || !isLoaded) return
+    if (!mapBounds || !isLoaded) return
+
+    if (hydrantPointsFiltered.length === 0) {
+      setVisibleHydrantPoints([])
+      return
+    }
 
     // Clear any existing timeout to prevent multiple updates
     if (boundsChangeTimeoutRef.current) {

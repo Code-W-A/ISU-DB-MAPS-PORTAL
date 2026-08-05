@@ -8,7 +8,7 @@ import { applicationDefault, cert, getApps, initializeApp } from "firebase-admin
 import { getFirestore } from "firebase-admin/firestore"
 
 const HYDRANTS_GIT_URL = "https://raw.githubusercontent.com/RaduPopescu95/isudb_maps_data/refs/heads/main/hidranti.json"
-const PRIMARII_GIT_URL = "https://raw.githubusercontent.com/RaduPopescu95/isudb_maps_data/refs/heads/main/newprimarii.json"
+const PRIMARII_GIT_URL = "https://raw.githubusercontent.com/Code-W-A/isudb_maps_data/refs/heads/main/newprimarii_actualizat.json"
 const SUBUNITATI_GIT_URL =
   "https://raw.githubusercontent.com/RaduPopescu95/isudb_maps_data/refs/heads/main/subunitati.js"
 const POLYGON_GIT_BASE_URL = "https://raw.githubusercontent.com/RaduPopescu95/isudb_maps_data/refs/heads/main"
