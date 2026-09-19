@@ -29,6 +29,7 @@ const ALL_TABS = [
   { value: "data", label: "Import Date" },
   { value: "settings", label: "Setări" },
   { value: "legislatie", label: "Legislație" },
+  { value: "isuNotes", label: "ISU Notes" },
   { value: "preventionZones", label: "Zone competență" },
   { value: "indrumator", label: "Îndrumător (hartă)" },
   { value: "adr", label: "ADR / Substanțe periculoase" },

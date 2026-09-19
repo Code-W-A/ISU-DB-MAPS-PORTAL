@@ -24,13 +24,15 @@ import {
   MdAccountBalance,
   MdWarning,
   MdReportProblem,
+  MdMap,
+  MdNotes,
 } from "react-icons/md"
 import { getAllUsers } from "@/lib/role-service"
 import type { UserRole } from "@/types/user-role"
 import { LegislatieTab } from "@/components/dashboard/legislatie-tab"
+import { IsuNotesTab } from "@/components/dashboard/isu-notes-tab"
 import { PreventionZonesPanel } from "@/components/dashboard/prevention-zones-panel"
 import { hasFullAccess } from "@/lib/role-service"
-import { MdMap } from "react-icons/md"
 
 export default function DashboardPage() {
   const { user, loading } = useAuth()
@@ -60,6 +62,7 @@ export default function DashboardPage() {
             "data",
             "settings",
             "legislatie",
+            "isuNotes",
             "preventionZones",
           ])
           
@@ -196,6 +199,12 @@ export default function DashboardPage() {
                 <span>Legislație</span>
               </TabsTrigger>
             )}
+            {allowedTabs.includes("isuNotes") && (
+              <TabsTrigger value="isuNotes" className="flex items-center justify-start md:justify-center gap-2 text-sm px-3 py-2 w-full md:w-auto">
+                <MdNotes className="h-4 w-4" />
+                <span>ISU Notes</span>
+              </TabsTrigger>
+            )}
             {allowedTabs.includes("preventionZones") && (
               <TabsTrigger
                 value="preventionZones"
@@ -306,6 +315,12 @@ export default function DashboardPage() {
         {allowedTabs.includes("legislatie") && (
           <TabsContent value="legislatie" className="space-y-6">
             <LegislatieTab />
+          </TabsContent>
+        )}
+
+        {allowedTabs.includes("isuNotes") && (
+          <TabsContent value="isuNotes" className="space-y-6">
+            <IsuNotesTab />
           </TabsContent>
         )}
 

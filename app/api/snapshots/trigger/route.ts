@@ -1,7 +1,7 @@
 import { type NextRequest, NextResponse } from "next/server"
 import { adminAuth, adminDb } from "@/lib/firebase-admin"
 
-type AllowedTab = "users" | "hydrants" | "reports" | "primarii" | "seveso" | "data" | "settings" | "legislatie"
+type AllowedTab = "users" | "hydrants" | "reports" | "primarii" | "seveso" | "data" | "settings" | "legislatie" | "isuNotes"
 
 interface DashboardUserAccess {
   fullAccess?: boolean

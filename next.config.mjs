@@ -12,11 +12,15 @@ const nextConfig = {
     domains: ['hebbkx1anhila5yf.public.blob.vercel-storage.com', 'firerescue.ro', 'www.firerescue.ro'],
     unoptimized: true,
   },
-  webpack: (config, { buildId, dev, isServer, defaultLoaders, webpack }) => {
-    // Configurare pentru react-pdf
+  webpack: (config) => {
+    // Configurare pentru react-pdf și pdf-lib/fontkit (export ISU Notes)
     config.resolve.alias.canvas = false
     config.resolve.alias.encoding = false
-    
+    config.resolve.fallback = {
+      ...(config.resolve.fallback || {}),
+      fs: false,
+    }
+
     return config
   },
   // Asigură-te că service worker-ul și manifestul sunt servite corect
