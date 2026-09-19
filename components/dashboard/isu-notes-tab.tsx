@@ -15,9 +15,10 @@ import {
 } from "@/components/ui/dialog"
 import { Input } from "@/components/ui/input"
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select"
-import { Textarea } from "@/components/ui/textarea"
+import { IsuNoteEditor } from "@/components/dashboard/isu-note-editor"
 import { toast } from "@/components/ui/use-toast"
 import { downloadIsuNotePdf } from "@/lib/isu-notes-pdf"
+import { plainTextFromHtml } from "@/lib/isu-notes-html"
 import {
   createEmptyPage,
   createIsuFolder,
@@ -52,7 +53,7 @@ type SortMode = "date-desc" | "date-asc" | "name"
 
 function previewText(note: IsuNote) {
   const text = note.pages
-    .map((page) => page.content)
+    .map((page) => plainTextFromHtml(page.content))
     .join(" ")
     .replace(/\s+/g, " ")
     .trim()
@@ -76,7 +77,7 @@ function formatDate(value: number) {
 }
 
 function searchHaystack(note: IsuNote) {
-  return `${note.title}\n${note.pages.map((page) => page.content).join("\n")}`.toLowerCase()
+  return `${note.title}\n${note.pages.map((page) => plainTextFromHtml(page.content)).join("\n")}`.toLowerCase()
 }
 
 function notesEqualForSave(a: IsuNote, b: IsuNote) {
@@ -484,12 +485,11 @@ export function IsuNotesTab() {
           )}
         </div>
 
-        <Textarea
-          value={currentPage?.content || ""}
-          onChange={(event) => handlePageContent(event.target.value)}
-          placeholder="Scrieți nota…"
-          disabled={!isOwner}
-          className="min-h-[420px] resize-y text-base leading-relaxed"
+        <IsuNoteEditor
+          key={currentPage?.id || "empty"}
+          content={currentPage?.content || ""}
+          readOnly={!isOwner}
+          onChange={handlePageContent}
         />
       </div>
     )
