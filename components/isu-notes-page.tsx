@@ -45,13 +45,13 @@ export function IsuNotesPage() {
 
   return (
     <div className="flex h-[100dvh] min-h-0 flex-col overflow-hidden bg-background">
-      <header className="relative z-30 flex shrink-0 items-center gap-2 border-b bg-background/95 px-2 py-1.5 backdrop-blur-sm">
+      <header className="sticky top-0 z-30 flex h-14 shrink-0 items-center gap-2 border-b bg-background/95 px-4 backdrop-blur-sm">
         <div className="shrink-0">
           <Button
             type="button"
             variant="ghost"
             size="icon"
-            className="h-9 w-9"
+            className="h-11 w-11"
             onClick={() => setMenuOpen(true)}
             aria-expanded={menuOpen}
             aria-controls="isu-notes-nav-sheet"
@@ -79,12 +79,12 @@ export function IsuNotesPage() {
             navContext={{ type: "tool", tool: "isuNotes" }}
           />
         </div>
-        <h1 className={cn("min-w-0 flex-1 truncate text-base font-semibold sm:text-lg")}>ISU Notes</h1>
-        <span className="hidden max-w-[10rem] shrink-0 truncate text-xs text-muted-foreground sm:block md:max-w-[14rem]">
+        <h1 className={cn("min-w-0 flex-1 truncate text-base font-semibold")}>ISU Notes</h1>
+        <span className="hidden min-w-0 max-w-[14rem] shrink-0 truncate text-xs text-muted-foreground md:flex">
           {user.email}
         </span>
       </header>
-      <main className="min-h-0 flex-1 overflow-y-auto p-3 md:p-6">
+      <main className="min-h-0 flex-1 overflow-y-auto px-4 py-3 pb-[calc(5.5rem+env(safe-area-inset-bottom))] md:p-6">
         <IsuNotesTab />
       </main>
       <LogoutConfirmDialog open={logoutOpen} onOpenChange={setLogoutOpen} />
