@@ -57,10 +57,11 @@ function ToolbarButton({
       type="button"
       size="sm"
       variant={active ? "default" : "ghost"}
-      className="h-8 px-2"
+      className="h-9 min-w-9 shrink-0 px-2 md:h-8"
       disabled={disabled}
       onClick={onClick}
       aria-label={label}
+      aria-pressed={active}
       title={label}
     >
       {children}
@@ -72,7 +73,11 @@ function EditorToolbar({ editor, disabled }: { editor: Editor; disabled: boolean
   const currentColor = editor.getAttributes("textStyle").color as string | undefined
 
   return (
-    <div className="flex flex-wrap items-center gap-0.5 border-b bg-muted/40 p-1">
+    <div
+      className={cn(
+        "sticky top-14 z-10 flex h-12 flex-nowrap items-center gap-0.5 overflow-x-auto border-b border-border/70 bg-background px-1 py-1 [scrollbar-width:none] [-ms-overflow-style:none] [&::-webkit-scrollbar]:hidden md:static md:h-auto md:flex-wrap md:bg-muted/40",
+      )}
+    >
       <ToolbarButton
         label="Anulează"
         disabled={disabled || !editor.can().undo()}
@@ -87,7 +92,7 @@ function EditorToolbar({ editor, disabled }: { editor: Editor; disabled: boolean
       >
         <MdRedo className="h-4 w-4" />
       </ToolbarButton>
-      <span className="mx-1 h-5 w-px bg-border" />
+      <span className="mx-1 h-5 w-px shrink-0 bg-border" />
       <ToolbarButton
         label="Bold"
         active={editor.isActive("bold")}
@@ -112,7 +117,7 @@ function EditorToolbar({ editor, disabled }: { editor: Editor; disabled: boolean
       >
         <MdFormatUnderlined className="h-4 w-4" />
       </ToolbarButton>
-      <span className="mx-1 h-5 w-px bg-border" />
+      <span className="mx-1 h-5 w-px shrink-0 bg-border" />
       <ToolbarButton
         label="Titlu 1"
         active={editor.isActive("heading", { level: 1 })}
@@ -131,7 +136,7 @@ function EditorToolbar({ editor, disabled }: { editor: Editor; disabled: boolean
         <MdTitle className="h-4 w-4" />
         <span className="text-[10px] font-bold">2</span>
       </ToolbarButton>
-      <span className="mx-1 h-5 w-px bg-border" />
+      <span className="mx-1 h-5 w-px shrink-0 bg-border" />
       <ToolbarButton
         label="Listă"
         active={editor.isActive("bulletList")}
@@ -178,24 +183,29 @@ function EditorToolbar({ editor, disabled }: { editor: Editor; disabled: boolean
       >
         <MdFormatIndentDecrease className="h-4 w-4" />
       </ToolbarButton>
-      <span className="mx-1 h-5 w-px bg-border" />
+      <span className="mx-1 h-5 w-px shrink-0 bg-border" />
       {TEXT_COLORS.map((color) => (
         <button
           key={color.value}
           type="button"
           title={color.label}
           aria-label={color.label}
+          aria-pressed={currentColor === color.value}
           disabled={disabled}
-          className={cn(
-            "h-5 w-5 rounded-full border border-black/10 disabled:opacity-40",
-            currentColor === color.value && "ring-2 ring-offset-1 ring-blue-500",
-          )}
-          style={{ backgroundColor: color.value }}
+          className="flex h-9 w-9 shrink-0 items-center justify-center disabled:opacity-40"
           onClick={() => {
             if (color.value === "#1f2937") editor.chain().focus().unsetColor().run()
             else editor.chain().focus().setColor(color.value).run()
           }}
-        />
+        >
+          <span
+            className={cn(
+              "h-5 w-5 rounded-full border border-black/10",
+              currentColor === color.value && "ring-2 ring-offset-1 ring-blue-500",
+            )}
+            style={{ backgroundColor: color.value }}
+          />
+        </button>
       ))}
     </div>
   )
@@ -223,7 +233,8 @@ export function IsuNoteEditor({ content, readOnly = false, onChange }: IsuNoteEd
     content: htmlFromLegacyPlain(content),
     editorProps: {
       attributes: {
-        class: "isu-note-prose min-h-[420px] px-3 py-3 text-base leading-relaxed focus:outline-none",
+        class:
+          "isu-note-prose min-h-[40dvh] px-4 py-3.5 text-base leading-[1.55] focus:outline-none md:min-h-[320px] md:px-3 md:py-3",
       },
     },
     onUpdate: ({ editor: current }) => {
@@ -237,13 +248,18 @@ export function IsuNoteEditor({ content, readOnly = false, onChange }: IsuNoteEd
   }, [editor, readOnly])
 
   if (!editor) {
-    return <div className="min-h-[420px] rounded-md border bg-muted/20" />
+    return <div className="min-h-[40dvh] bg-muted/20 md:min-h-[320px] md:rounded-md md:border" />
   }
 
   return (
-    <div className={cn("isu-note-editor overflow-hidden rounded-md border bg-white", readOnly && "opacity-95")}>
+    <div
+      className={cn(
+        "isu-note-editor flex min-h-0 flex-1 flex-col border-t border-border/60 bg-background md:overflow-hidden md:rounded-md md:border md:border-t md:bg-white",
+        readOnly && "opacity-95",
+      )}
+    >
       <EditorToolbar editor={editor} disabled={readOnly} />
-      <EditorContent editor={editor} />
+      <EditorContent editor={editor} className="min-h-0 flex-1" />
     </div>
   )
 }

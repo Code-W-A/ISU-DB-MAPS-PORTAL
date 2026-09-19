@@ -16,6 +16,7 @@ export function IsuNotesPage() {
   const router = useRouter()
   const [menuOpen, setMenuOpen] = useState(false)
   const [logoutOpen, setLogoutOpen] = useState(false)
+  const [editing, setEditing] = useState(false)
   const nav = useMapAppNavPermissions(user, "preventionOrTool")
 
   useEffect(() => {
@@ -45,7 +46,12 @@ export function IsuNotesPage() {
 
   return (
     <div className="flex h-[100dvh] min-h-0 flex-col overflow-hidden bg-background">
-      <header className="sticky top-0 z-30 flex h-14 shrink-0 items-center gap-2 border-b bg-background/95 px-4 backdrop-blur-sm">
+      <header
+        className={cn(
+          "sticky top-0 z-30 h-14 shrink-0 items-center gap-2 border-b bg-background/95 px-4 backdrop-blur-sm",
+          editing ? "hidden md:flex" : "flex",
+        )}
+      >
         <div className="shrink-0">
           <Button
             type="button"
@@ -84,8 +90,13 @@ export function IsuNotesPage() {
           {user.email}
         </span>
       </header>
-      <main className="min-h-0 flex-1 overflow-y-auto px-4 py-3 pb-[calc(5.5rem+env(safe-area-inset-bottom))] md:p-6">
-        <IsuNotesTab />
+      <main
+        className={cn(
+          "min-h-0 flex-1 overflow-y-auto",
+          editing ? "p-0 md:p-6" : "px-4 py-3 pb-[calc(5.5rem+env(safe-area-inset-bottom))] md:p-6",
+        )}
+      >
+        <IsuNotesTab onEditingChange={setEditing} />
       </main>
       <LogoutConfirmDialog open={logoutOpen} onOpenChange={setLogoutOpen} />
     </div>

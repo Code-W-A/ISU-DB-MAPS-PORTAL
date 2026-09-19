@@ -239,7 +239,12 @@ html:has(.map-shell) body {
 }
 
 .isu-note-editor .ProseMirror {
-  min-height: 420px;
+  min-height: 40dvh;
+}
+@media (min-width: 768px) {
+  .isu-note-editor .ProseMirror {
+    min-height: 320px;
+  }
 }
 .isu-note-editor .ProseMirror p.is-editor-empty:first-child::before,
 .isu-note-editor .ProseMirror p.is-empty:first-child::before {

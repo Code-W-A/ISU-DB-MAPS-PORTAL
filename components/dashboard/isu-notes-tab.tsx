@@ -109,7 +109,7 @@ function notesEqualForSave(a: IsuNote, b: IsuNote) {
   )
 }
 
-export function IsuNotesTab() {
+export function IsuNotesTab({ onEditingChange }: { onEditingChange?: (editing: boolean) => void } = {}) {
   const { user } = useAuth()
   const [folders, setFolders] = useState<IsuNoteFolder[]>([])
   const [notes, setNotes] = useState<IsuNote[]>([])
@@ -140,6 +140,12 @@ export function IsuNotesTab() {
   useEffect(() => {
     draftRef.current = draft
   }, [draft])
+
+  const isEditingNote = draft !== null
+  useEffect(() => {
+    onEditingChange?.(isEditingNote)
+    return () => onEditingChange?.(false)
+  }, [isEditingNote, onEditingChange])
 
   useEffect(() => {
     if (!uid) return
@@ -443,16 +449,69 @@ export function IsuNotesTab() {
   }
 
   if (draft) {
+    const saveLabel =
+      saveState === "saving"
+        ? "Se salvează…"
+        : saveState === "saved"
+          ? "Salvat ✓"
+          : isOwner
+            ? "Salvare automată"
+            : "Doar citire"
+    const mobileSaveLabel =
+      saveState === "saving" ? "Se salvează…" : saveState === "saved" ? "Salvat ✓" : isOwner ? "" : "Doar citire"
+
     return (
-      <div className="space-y-4">
-        <div className="flex flex-col gap-3 lg:flex-row lg:items-center lg:justify-between">
+      <div className="flex min-h-full flex-col">
+        <header className="sticky top-0 z-20 flex h-14 shrink-0 items-center gap-1 border-b border-border/70 bg-background px-2 md:hidden">
+          <Button
+            type="button"
+            variant="ghost"
+            size="icon"
+            className="h-11 w-11 shrink-0"
+            aria-label="Înapoi la note"
+            onClick={() => void handleBackToList()}
+          >
+            <MdArrowBack className="h-5 w-5" />
+          </Button>
+          <div className="min-w-0 flex-1">
+            <p className="truncate text-sm font-semibold leading-tight">Editare notă</p>
+            {mobileSaveLabel ? (
+              <p className="truncate text-[11px] leading-tight text-muted-foreground">{mobileSaveLabel}</p>
+            ) : null}
+          </div>
+          <DropdownMenu>
+            <DropdownMenuTrigger asChild>
+              <Button type="button" variant="ghost" size="icon" className="h-11 w-11 shrink-0" aria-label="Acțiuni notă">
+                <MdMoreVert className="h-5 w-5" />
+              </Button>
+            </DropdownMenuTrigger>
+            <DropdownMenuContent align="end">
+              <DropdownMenuItem disabled={exporting} onSelect={() => void handleExportPdf()}>
+                <MdPictureAsPdf className="mr-2 h-4 w-4" />
+                {exporting ? "Se exportă…" : "Exportă PDF"}
+              </DropdownMenuItem>
+              {isOwner && (
+                <>
+                  <DropdownMenuSeparator />
+                  <DropdownMenuItem
+                    className="text-destructive focus:text-destructive"
+                    onSelect={() => void handleDeleteNote()}
+                  >
+                    <MdDelete className="mr-2 h-4 w-4" />
+                    Șterge nota
+                  </DropdownMenuItem>
+                </>
+              )}
+            </DropdownMenuContent>
+          </DropdownMenu>
+        </header>
+
+        <div className="hidden items-center justify-between gap-3 md:flex">
           <Button variant="ghost" className="w-fit" onClick={() => void handleBackToList()}>
             <MdArrowBack className="mr-2 h-4 w-4" /> Înapoi la note
           </Button>
           <div className="flex flex-wrap items-center gap-2">
-            <span className="text-xs text-muted-foreground">
-              {saveState === "saving" ? "Se salvează…" : saveState === "saved" ? "Salvat" : isOwner ? "Salvare automată" : "Doar citire"}
-            </span>
+            <span className="text-xs text-muted-foreground">{saveLabel}</span>
             <Button variant="outline" size="sm" onClick={() => void handleExportPdf()} disabled={exporting}>
               <MdPictureAsPdf className="mr-1 h-4 w-4" />
               {exporting ? "Se exportă…" : "Export PDF"}
@@ -465,84 +524,137 @@ export function IsuNotesTab() {
           </div>
         </div>
 
-        {!isOwner && (
-          <p className="rounded-md border border-amber-200 bg-amber-50 px-3 py-2 text-sm text-amber-900">
-            Notă comună de la {draft.ownerEmail || "alt utilizator"} — doar citire.
-          </p>
-        )}
+        <div className="flex min-h-0 flex-1 flex-col px-4 pb-[max(0.75rem,env(safe-area-inset-bottom))] pt-3 md:mt-4 md:px-0 md:pb-0">
+          {!isOwner && (
+            <p className="mb-3 rounded-xl border border-amber-200 bg-amber-50 px-3 py-2 text-sm text-amber-900">
+              Notă comună de la {draft.ownerEmail || "alt utilizator"} — doar citire.
+            </p>
+          )}
 
-        <Input
-          value={draft.title}
-          onChange={(event) => updateDraft({ title: event.target.value })}
-          placeholder="Titlu"
-          disabled={!isOwner}
-          className="text-lg font-semibold"
-        />
+          <Input
+            value={draft.title}
+            onChange={(event) => updateDraft({ title: event.target.value })}
+            placeholder="Titlul notei"
+            disabled={!isOwner}
+            aria-label="Titlul notei"
+            className="h-auto rounded-none border-0 border-b border-border/70 bg-transparent px-0 py-2 text-[20px] font-semibold leading-snug shadow-none focus-visible:ring-0 focus-visible:ring-offset-2 focus-visible:ring-offset-background md:text-xl"
+          />
 
-        <div className="flex flex-col gap-3 md:flex-row md:flex-wrap md:items-center">
-          <div className="flex rounded-md border p-1">
-            {(["private", "common"] as IsuNoteVisibility[]).map((value) => (
-              <Button
-                key={value}
-                type="button"
-                size="sm"
-                variant={draft.visibility === value ? "default" : "ghost"}
-                disabled={!isOwner}
-                onClick={() => updateDraft({ visibility: value })}
-              >
-                {value === "private" ? "Privat" : "Comun"}
-              </Button>
-            ))}
+          <div className="mt-3 flex flex-col gap-2.5 md:flex-row md:flex-wrap md:items-center">
+            <div className="flex h-10 w-full rounded-xl bg-muted p-0.5 md:w-auto" role="group" aria-label="Vizibilitate">
+              {(["private", "common"] as IsuNoteVisibility[]).map((value) => {
+                const selected = draft.visibility === value
+                return (
+                  <button
+                    key={value}
+                    type="button"
+                    aria-pressed={selected}
+                    disabled={!isOwner}
+                    className={`inline-flex h-9 min-w-[44px] flex-1 items-center justify-center gap-1.5 rounded-[10px] px-3 text-sm font-medium transition md:flex-none ${
+                      selected ? "bg-primary text-primary-foreground" : "text-muted-foreground"
+                    }`}
+                    onClick={() => updateDraft({ visibility: value })}
+                  >
+                    {value === "private" ? <MdLock className="h-4 w-4" /> : <MdPeople className="h-4 w-4" />}
+                    {value === "private" ? "Privat" : "Comun"}
+                  </button>
+                )
+              })}
+            </div>
+
+            <Select
+              value={folderSelectValue}
+              onValueChange={(value) => updateDraft({ folderId: value === FOLDER_NONE ? null : value })}
+              disabled={!isOwner}
+            >
+              <SelectTrigger className="h-11 w-full rounded-xl border-border/80 md:h-10 md:w-[240px]" aria-label="Folder">
+                <span className="flex min-w-0 items-center gap-2">
+                  <MdFolder className="h-4 w-4 shrink-0 text-muted-foreground" />
+                  <SelectValue placeholder="Folder" />
+                </span>
+              </SelectTrigger>
+              <SelectContent>
+                <SelectItem value={FOLDER_NONE}>Neclasificat</SelectItem>
+                {folders.map((folder) => (
+                  <SelectItem key={folder.id} value={folder.id}>
+                    {folder.name}
+                  </SelectItem>
+                ))}
+              </SelectContent>
+            </Select>
           </div>
 
-          <Select
-            value={folderSelectValue}
-            onValueChange={(value) => updateDraft({ folderId: value === FOLDER_NONE ? null : value })}
-            disabled={!isOwner}
+          <div
+            className="mt-3 flex flex-nowrap items-center gap-1.5 overflow-x-auto [scrollbar-width:none] [-ms-overflow-style:none] [&::-webkit-scrollbar]:hidden"
+            role="tablist"
+            aria-label="Pagini"
           >
-            <SelectTrigger className="w-full md:w-[240px]">
-              <SelectValue placeholder="Folder" />
-            </SelectTrigger>
-            <SelectContent>
-              <SelectItem value={FOLDER_NONE}>Neclasificat</SelectItem>
-              {folders.map((folder) => (
-                <SelectItem key={folder.id} value={folder.id}>
-                  {folder.name}
-                </SelectItem>
-              ))}
-            </SelectContent>
-          </Select>
-        </div>
-
-        <div className="flex flex-wrap items-center gap-2">
-          {draft.pages.map((page, index) => (
-            <Button
-              key={page.id}
-              size="sm"
-              variant={index === pageIndex ? "default" : "outline"}
-              onClick={() => setPageIndex(index)}
-            >
-              Pagina {index + 1}
-            </Button>
-          ))}
-          {isOwner && (
-            <>
-              <Button size="sm" variant="outline" onClick={handleAddPage}>
-                <MdAdd className="mr-1 h-4 w-4" /> Pagină
+            {draft.pages.map((page, index) => {
+              const selected = index === pageIndex
+              return (
+                <div key={page.id} className="flex shrink-0 items-center">
+                  <button
+                    type="button"
+                    role="tab"
+                    aria-selected={selected}
+                    aria-label={`Pagina ${index + 1}`}
+                    className={`h-10 min-w-10 rounded-full px-3 text-sm font-medium ${
+                      selected ? "bg-primary text-primary-foreground" : "bg-muted text-muted-foreground"
+                    }`}
+                    onClick={() => setPageIndex(index)}
+                  >
+                    <span className="md:hidden">{index + 1}</span>
+                    <span className="hidden md:inline">Pagina {index + 1}</span>
+                  </button>
+                  {selected && isOwner && draft.pages.length > 1 && (
+                    <DropdownMenu>
+                      <DropdownMenuTrigger asChild>
+                        <Button
+                          type="button"
+                          variant="ghost"
+                          size="icon"
+                          className="h-10 w-10 shrink-0"
+                          aria-label="Acțiuni pagină"
+                        >
+                          <MdMoreVert className="h-4 w-4" />
+                        </Button>
+                      </DropdownMenuTrigger>
+                      <DropdownMenuContent align="start">
+                        <DropdownMenuItem
+                          className="text-destructive focus:text-destructive"
+                          onSelect={() => handleDeletePage()}
+                        >
+                          Șterge pagina
+                        </DropdownMenuItem>
+                      </DropdownMenuContent>
+                    </DropdownMenu>
+                  )}
+                </div>
+              )
+            })}
+            {isOwner && (
+              <Button
+                type="button"
+                size="icon"
+                variant="outline"
+                className="h-10 w-10 shrink-0 rounded-full"
+                aria-label="Pagină nouă"
+                onClick={handleAddPage}
+              >
+                <MdAdd className="h-4 w-4" />
               </Button>
-              <Button size="sm" variant="ghost" onClick={handleDeletePage} disabled={draft.pages.length <= 1}>
-                Șterge pagina
-              </Button>
-            </>
-          )}
-        </div>
+            )}
+          </div>
 
-        <IsuNoteEditor
-          key={currentPage?.id || "empty"}
-          content={currentPage?.content || ""}
-          readOnly={!isOwner}
-          onChange={handlePageContent}
-        />
+          <div className="mt-3 flex min-h-0 flex-1 flex-col">
+            <IsuNoteEditor
+              key={currentPage?.id || "empty"}
+              content={currentPage?.content || ""}
+              readOnly={!isOwner}
+              onChange={handlePageContent}
+            />
+          </div>
+        </div>
       </div>
     )
   }
