@@ -1,33 +1,22 @@
 "use client"
 
-import { useState, useEffect } from "react"
+import { useEffect, useState } from "react"
 import { useRouter } from "next/navigation"
 import { useAuth } from "@/components/auth-provider"
 import { LogoutConfirmDialog } from "@/components/logout-confirm-dialog"
 import { Button } from "@/components/ui/button"
-import { MapAppNavSheet, type MapAppNavContext } from "@/components/map-app-nav"
+import { MapAppNavSheet } from "@/components/map-app-nav"
+import { IsuNotesTab } from "@/components/dashboard/isu-notes-tab"
 import { useMapAppNavPermissions } from "@/hooks/use-map-app-nav-permissions"
 import { MdMenu } from "react-icons/md"
 import { cn } from "@/lib/utils"
 
-function mapToolToContext(tool: "indrumator" | "adr"): MapAppNavContext {
-  return { type: "tool", tool }
-}
-
-type ToolEmbedPageProps = {
-  title: string
-  iframeSrc: string
-  iframeTitle: string
-  tool: "indrumator" | "adr"
-}
-
-export function ToolEmbedPage({ title, iframeSrc, iframeTitle, tool }: ToolEmbedPageProps) {
+export function IsuNotesPage() {
   const { user, loading } = useAuth()
   const router = useRouter()
   const [menuOpen, setMenuOpen] = useState(false)
   const [logoutOpen, setLogoutOpen] = useState(false)
   const nav = useMapAppNavPermissions(user, "preventionOrTool")
-  const navContext = mapToolToContext(tool)
 
   useEffect(() => {
     if (!loading && !user) {
@@ -35,9 +24,14 @@ export function ToolEmbedPage({ title, iframeSrc, iframeTitle, tool }: ToolEmbed
     }
   }, [user, loading, router])
 
-  const handleSignOut = () => setLogoutOpen(true)
+  useEffect(() => {
+    if (!user || !nav.ready) return
+    if (!nav.mapToolLinks.showIsuNotesLink) {
+      router.replace("/")
+    }
+  }, [user, nav.ready, nav.mapToolLinks.showIsuNotesLink, router])
 
-  if (loading) {
+  if (loading || !user || !nav.ready) {
     return (
       <div className="flex h-screen items-center justify-center">
         <p>Se încarcă...</p>
@@ -45,7 +39,7 @@ export function ToolEmbedPage({ title, iframeSrc, iframeTitle, tool }: ToolEmbed
     )
   }
 
-  if (!user) {
+  if (!nav.mapToolLinks.showIsuNotesLink) {
     return null
   }
 
@@ -60,7 +54,7 @@ export function ToolEmbedPage({ title, iframeSrc, iframeTitle, tool }: ToolEmbed
             className="h-9 w-9"
             onClick={() => setMenuOpen(true)}
             aria-expanded={menuOpen}
-            aria-controls={`tool-embed-nav-${tool}`}
+            aria-controls="isu-notes-nav-sheet"
             aria-label="Deschide meniul de navigare"
           >
             <MdMenu size={22} />
@@ -68,7 +62,7 @@ export function ToolEmbedPage({ title, iframeSrc, iframeTitle, tool }: ToolEmbed
           <MapAppNavSheet
             open={menuOpen}
             onOpenChange={setMenuOpen}
-            sheetId={`tool-embed-nav-${tool}`}
+            sheetId="isu-notes-nav-sheet"
             isAdmin={nav.hasDashboardAccess}
             onNavigateToDashboard={() => {
               setMenuOpen(false)
@@ -76,25 +70,23 @@ export function ToolEmbedPage({ title, iframeSrc, iframeTitle, tool }: ToolEmbed
             }}
             onSignOut={() => {
               setMenuOpen(false)
-              handleSignOut()
+              setLogoutOpen(true)
             }}
             showIndrumatorLink={nav.mapToolLinks.showIndrumatorLink}
             showAdrLink={nav.mapToolLinks.showAdrLink}
             showIsuNotesLink={nav.mapToolLinks.showIsuNotesLink}
             showPreventionFullMapLink={nav.hasPreventionZonesAccess}
-            navContext={navContext}
+            navContext={{ type: "tool", tool: "isuNotes" }}
           />
         </div>
-        <h1 className={cn("min-w-0 flex-1 truncate text-base font-semibold sm:text-lg")}>{title}</h1>
+        <h1 className={cn("min-w-0 flex-1 truncate text-base font-semibold sm:text-lg")}>ISU Notes</h1>
         <span className="hidden max-w-[10rem] shrink-0 truncate text-xs text-muted-foreground sm:block md:max-w-[14rem]">
           {user.email}
         </span>
       </header>
-      <iframe
-        title={iframeTitle}
-        src={iframeSrc}
-        className="min-h-0 w-full flex-1 border-0"
-      />
+      <main className="min-h-0 flex-1 overflow-y-auto p-3 md:p-6">
+        <IsuNotesTab />
+      </main>
       <LogoutConfirmDialog open={logoutOpen} onOpenChange={setLogoutOpen} />
     </div>
   )

@@ -21,9 +21,10 @@ interface GoogleMapsLoaderProps {
   variant?: "default" | "prevention"
   /** Pe harta generală: link către `/prevenire` pentru utilizatori cu acces la zone competență. */
   showPreventionFullMapLink?: boolean
-  /** Din coloana „Taburi permise” (allowedTabs: indrumator / adr). */
+  /** Din coloana „Taburi permise” (allowedTabs: indrumator / adr / isuNotes). */
   showIndrumatorLink?: boolean
   showAdrLink?: boolean
+  showIsuNotesLink?: boolean
 }
 
 export function GoogleMapsLoader({
@@ -35,6 +36,7 @@ export function GoogleMapsLoader({
   showPreventionFullMapLink = false,
   showIndrumatorLink = false,
   showAdrLink = false,
+  showIsuNotesLink = false,
 }: GoogleMapsLoaderProps) {
   const [desktopNavOpen, setDesktopNavOpen] = useState(false)
   const [apiKey, setApiKey] = useState<string | null>(null)
@@ -252,6 +254,7 @@ export function GoogleMapsLoader({
             showPreventionFullMapLink={showPreventionFullMapLink}
             showIndrumatorLink={showIndrumatorLink}
             showAdrLink={showAdrLink}
+            showIsuNotesLink={showIsuNotesLink}
           />
           <div className="flex-1 relative min-h-0">{renderChildren()}</div>
         </>
@@ -281,6 +284,7 @@ export function GoogleMapsLoader({
                   onSignOut={onSignOut}
                   showIndrumatorLink={showIndrumatorLink}
                   showAdrLink={showAdrLink}
+                  showIsuNotesLink={showIsuNotesLink}
                   showPreventionFullMapLink={showPreventionFullMapLink}
                   navContext={{ type: "map", mapVariant: isPrevention ? "prevention" : "default" }}
                 />

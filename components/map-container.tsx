@@ -49,6 +49,7 @@ export function MapContainer() {
         showPreventionFullMapLink={nav.hasPreventionZonesAccess}
         showIndrumatorLink={nav.mapToolLinks.showIndrumatorLink}
         showAdrLink={nav.mapToolLinks.showAdrLink}
+        showIsuNotesLink={nav.mapToolLinks.showIsuNotesLink}
       >
         <Map hasAccess={hasAccess} isAdmin={isAdminForMap} />
       </GoogleMapsLoader>

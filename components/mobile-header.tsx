@@ -15,6 +15,7 @@ interface MobileHeaderProps {
   showPreventionFullMapLink?: boolean
   showIndrumatorLink?: boolean
   showAdrLink?: boolean
+  showIsuNotesLink?: boolean
 }
 
 export function MobileHeader({
@@ -25,6 +26,7 @@ export function MobileHeader({
   showPreventionFullMapLink = false,
   showIndrumatorLink = false,
   showAdrLink = false,
+  showIsuNotesLink = false,
 }: MobileHeaderProps) {
   const [menuOpen, setMenuOpen] = useState(false)
   const isPrevention = variant === "prevention"
@@ -53,6 +55,7 @@ export function MobileHeader({
           onSignOut={onSignOut}
           showIndrumatorLink={showIndrumatorLink}
           showAdrLink={showAdrLink}
+          showIsuNotesLink={showIsuNotesLink}
           showPreventionFullMapLink={showPreventionFullMapLink}
           navContext={{ type: "map", mapVariant: isPrevention ? "prevention" : "default" }}
         />

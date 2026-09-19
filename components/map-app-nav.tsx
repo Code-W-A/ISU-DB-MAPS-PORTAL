@@ -15,6 +15,7 @@ import {
   MdHealthAndSafety,
   MdMenuBook,
   MdScience,
+  MdNotes,
 } from "react-icons/md"
 import { cn } from "@/lib/utils"
 
@@ -42,7 +43,7 @@ function NavItemLink({
 
 export type MapAppNavContext =
   | { type: "map"; mapVariant: "default" | "prevention" }
-  | { type: "tool"; tool: "indrumator" | "adr" }
+  | { type: "tool"; tool: "indrumator" | "adr" | "isuNotes" }
 
 export interface MapAppNavListBaseProps {
   isAdmin: boolean
@@ -50,6 +51,7 @@ export interface MapAppNavListBaseProps {
   onSignOut: () => void
   showIndrumatorLink: boolean
   showAdrLink: boolean
+  showIsuNotesLink: boolean
   showPreventionFullMapLink: boolean
   onClose: () => void
   navContext: MapAppNavContext
@@ -75,6 +77,12 @@ function MapAppNavListMapMode({
         <NavItemLink href="/adr" onClose={onClose}>
           <MdScience size={22} className="shrink-0" />
           <span>ADR substanțe</span>
+        </NavItemLink>
+      )}
+      {p.showIsuNotesLink && (
+        <NavItemLink href="/isu-notes" onClose={onClose}>
+          <MdNotes size={22} className="shrink-0" />
+          <span>ISU Notes</span>
         </NavItemLink>
       )}
       {isPrevention && (
@@ -144,6 +152,12 @@ function MapAppNavListToolMode({ onClose, ...p }: NavListFields) {
         <NavItemLink href="/adr" onClose={onClose}>
           <MdScience size={22} className="shrink-0" />
           <span>ADR substanțe</span>
+        </NavItemLink>
+      )}
+      {p.showIsuNotesLink && (
+        <NavItemLink href="/isu-notes" onClose={onClose}>
+          <MdNotes size={22} className="shrink-0" />
+          <span>ISU Notes</span>
         </NavItemLink>
       )}
       {p.isAdmin && p.onNavigateToDashboard && (

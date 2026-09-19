@@ -2,10 +2,14 @@
 
 import { useEffect, useState } from "react"
 import type { User } from "firebase/auth"
-import { getMapToolLinkFlags, MAIN_ADMIN_EMAIL } from "@/lib/map-tool-links"
+import { getMapToolLinkFlags, MAIN_ADMIN_EMAIL, type MapToolLinkFlags } from "@/lib/map-tool-links"
 import { getAllUsers, getPreventionZonesAccessForAuthUser, hasFullAccess } from "@/lib/role-service"
 
-const emptyFlags = { showIndrumatorLink: false, showAdrLink: false }
+const emptyFlags: MapToolLinkFlags = {
+  showIndrumatorLink: false,
+  showAdrLink: false,
+  showIsuNotesLink: false,
+}
 
 export type MapToolLinkLoadMode = "mapHome" | "preventionOrTool"
 
@@ -32,7 +36,7 @@ export async function loadHasDashboardAccess(user: { uid: string; email: string 
 export async function loadMapToolLinkFlags(
   user: { uid: string; email: string | null },
   mode: MapToolLinkLoadMode,
-): Promise<{ showIndrumatorLink: boolean; showAdrLink: boolean }> {
+): Promise<MapToolLinkFlags> {
   if (!user.email) return emptyFlags
   if (user.email === MAIN_ADMIN_EMAIL) {
     return getMapToolLinkFlags({ email: user.email, allowedTabs: undefined })
@@ -58,7 +62,7 @@ export async function loadMapToolLinkFlags(
 }
 
 export type MapAppNavPermissionState = {
-  mapToolLinks: { showIndrumatorLink: boolean; showAdrLink: boolean }
+  mapToolLinks: MapToolLinkFlags
   hasDashboardAccess: boolean
   /** are acces la zonele de competență (hartă /prevenire) */
   hasPreventionZonesAccess: boolean
@@ -74,7 +78,7 @@ export function useMapAppNavPermissions(
   toolLinkMode: MapToolLinkLoadMode,
 ): MapAppNavPermissionState {
   const [state, setState] = useState<MapAppNavPermissionState>({
-    mapToolLinks: { showIndrumatorLink: false, showAdrLink: false },
+    mapToolLinks: emptyFlags,
     hasDashboardAccess: false,
     hasPreventionZonesAccess: false,
     ready: !user,
@@ -83,7 +87,7 @@ export function useMapAppNavPermissions(
   useEffect(() => {
     if (!user) {
       setState({
-        mapToolLinks: { showIndrumatorLink: false, showAdrLink: false },
+        mapToolLinks: emptyFlags,
         hasDashboardAccess: false,
         hasPreventionZonesAccess: false,
         ready: true,
