@@ -56,6 +56,15 @@ export async function loadHydrantsData(): Promise<Hydrant[]> {
     if (firestoreData.length > 0) return firestoreData
   }
 
+  if (dataSource === "git") {
+    try {
+      const gitData = await loadHydrantsFromGit()
+      if (gitData.length > 0) return gitData
+    } catch (error) {
+      console.error("Git indisponibil, se folosește snapshot-ul:", error)
+    }
+  }
+
   const snapshotData = await loadHydrantsFromSnapshot()
   if (snapshotData.length > 0) return snapshotData
 

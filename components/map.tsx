@@ -72,6 +72,7 @@ import {
   type HydrantAttributeFilters,
 } from "@/lib/hydrant-attribute-filters"
 import { HydrantAttributeFilterControls } from "@/components/hydrant-attribute-filter-controls"
+import { getActiveReportedProblemLabels } from "@/lib/hydrant-report-processing"
 
 // Declare google variable
 declare global {
@@ -2187,6 +2188,16 @@ export function Map({ apiKey = "", hasAccess = false, isAdmin = false }: MapProp
                       </Badge>
                     )}
                   </div>
+                  {getActiveReportedProblemLabels(selectedHydrant).length > 0 && (
+                    <div className="flex flex-wrap items-center gap-2">
+                      <span className="font-semibold">Avertizări:</span>
+                      {getActiveReportedProblemLabels(selectedHydrant).map((problem) => (
+                        <Badge key={problem} variant="destructive" className="flex items-center gap-1">
+                          <MdWarning size={12} /> {problem}
+                        </Badge>
+                      ))}
+                    </div>
+                  )}
                   <div className="flex items-center gap-1">
                     <span className="font-semibold">Coordonate:</span>
                     <MdMyLocation size={16} />
@@ -2549,6 +2560,15 @@ export function Map({ apiKey = "", hasAccess = false, isAdmin = false }: MapProp
                     <p className="text-sm text-muted-foreground">
                       <span className="font-semibold text-foreground">Reper:</span> {selectedHydrant.Reper}
                     </p>
+                  )}
+                  {getActiveReportedProblemLabels(selectedHydrant).length > 0 && (
+                    <div className="flex flex-wrap gap-2">
+                      {getActiveReportedProblemLabels(selectedHydrant).map((problem) => (
+                        <Badge key={problem} variant="destructive" className="flex items-center gap-1">
+                          <MdWarning size={12} /> {problem}
+                        </Badge>
+                      ))}
+                    </div>
                   )}
                   <div className="space-y-2 pt-1">
                     <Button

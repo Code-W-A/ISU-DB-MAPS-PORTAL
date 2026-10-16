@@ -12,15 +12,14 @@ import { MdSearch, MdRefresh, MdCheck, MdClose, MdInfo, MdAdd, MdEdit } from "re
 import {
   getAllHydrantReports,
   getHydrantReportsByStatus,
-  updateHydrantReportStatus,
-  getHydrantReportById,
 } from "@/lib/hydrant-report-service"
-import { addHydrantToFirestore, updateHydrantInFirestore } from "@/lib/hydrant-firestore-service"
 import type { HydrantReport, HydrantReportStatus } from "@/types/hydrant-report"
-import type { Hydrant } from "@/types/hydrant"
+import type { HydrantReportDecision, HydrantReportDecisionResponse } from "@/types/hydrant-report-decision"
 import { useMediaQuery } from "@/hooks/use-media-query"
+import { useAuth } from "@/components/auth-provider"
 
 export function HydrantReportsTable() {
+  const { user } = useAuth()
   const [reports, setReports] = useState<HydrantReport[]>([])
   const [filteredReports, setFilteredReports] = useState<HydrantReport[]>([])
   const [isLoading, setIsLoading] = useState(true)
@@ -98,88 +97,72 @@ export function HydrantReportsTable() {
     setIsDetailsDialogOpen(true)
   }
 
-  // Funcție pentru aprobarea unei semnalări
+  const submitDecision = async (reportId: string, decision: HydrantReportDecision) => {
+    if (!user) throw new Error("Sesiunea de autentificare nu este disponibilă.")
+    const token = await user.getIdToken()
+    const response = await fetch(`/api/hydrant-reports/${encodeURIComponent(reportId)}/decision`, {
+      method: "POST",
+      headers: {
+        Authorization: `Bearer ${token}`,
+        "Content-Type": "application/json",
+      },
+      body: JSON.stringify({ decision }),
+    })
+    const result = (await response.json()) as HydrantReportDecisionResponse
+    if (!response.ok || !result.ok) {
+      const stageLabels = { auth: "autentificare", validation: "validare", firestore: "Firestore", git: "GitHub" }
+      const stageLabel = result.stage ? stageLabels[result.stage] : "procesare"
+      throw new Error(`${stageLabel}: ${result.error || "Eroare necunoscută."}`)
+    }
+    return result
+  }
+
   const handleApproveReport = async (reportId: string) => {
     setIsProcessing(true)
-
     try {
-      // Obținem semnalarea completă
-      const report = await getHydrantReportById(reportId)
-
-      if (!report) {
-        throw new Error("Semnalarea nu a fost găsită")
-      }
-
-      // Procesăm semnalarea în funcție de tip
-      if (report.tip === "nou") {
-        // Adăugăm hidrantul nou în Firestore
-        await addHydrantToFirestore(report.date as Hydrant)
-      } else if (report.tip === "modificare" && (!report.quickReason || report.quickReason === "nefunctional")) {
-        if (!report.hidrantId) {
-          toast({
-            title: "Semnalare invalidă",
-            description: "Lipsește ID-ul hidrantului. Nu se poate aproba această modificare.",
-            variant: "destructive",
-          })
-          return
-        }
-
-        // Actualizăm hidrantul existent în Firestore
-        await updateHydrantInFirestore(report.hidrantId, report.date as Hydrant)
-      }
-
-      // Actualizăm statusul semnalării
-      await updateHydrantReportStatus(reportId, "aprobat")
-
-      // Actualizăm lista locală
-      setReports(reports.map((r) => (r.id === reportId ? { ...r, status: "aprobat" } : r)))
-
+      const result = await submitDecision(reportId, "approve")
       toast({
         title: "Succes",
-        description: "Semnalarea a fost aprobată și procesată cu succes",
+        description: result.alreadyProcessed
+          ? "Semnalarea era deja aprobată."
+          : "Semnalarea a fost salvată în Firestore și GitHub.",
       })
-
-      // Închidem dialogul dacă este deschis
+      if (result.snapshot?.status === "failed" || result.snapshot?.status === "not_requested") {
+        toast({
+          title: "Snapshot nesincronizat",
+          description: result.snapshot.error || "Workflow-ul de snapshot trebuie pornit manual.",
+          variant: "destructive",
+        })
+      }
       if (isDetailsDialogOpen && selectedReport?.id === reportId) {
         setIsDetailsDialogOpen(false)
       }
+      await loadReports()
     } catch (error) {
       console.error("Eroare la aprobarea semnalării:", error)
       toast({
-        title: "Eroare",
-        description: "Nu s-a putut aproba semnalarea",
+        title: "Aprobarea a fost blocată",
+        description: error instanceof Error ? error.message : "Nu s-a putut aproba semnalarea.",
         variant: "destructive",
       })
+      await loadReports()
     } finally {
       setIsProcessing(false)
     }
   }
 
-  // Funcție pentru respingerea unei semnalări
   const handleRejectReport = async (reportId: string) => {
     setIsProcessing(true)
-
     try {
-      // Actualizăm statusul semnalării
-      await updateHydrantReportStatus(reportId, "respins")
-
-      // Actualizăm lista locală
-      setReports(reports.map((r) => (r.id === reportId ? { ...r, status: "respins" } : r)))
-
-      toast({
-        title: "Succes",
-        description: "Semnalarea a fost respinsă",
-      })
-
-      // Închidem dialogul dacă este deschis
-      if (isDetailsDialogOpen && selectedReport?.id === reportId) {
-        setIsDetailsDialogOpen(false)
-      }
+      await submitDecision(reportId, "reject")
+      toast({ title: "Succes", description: "Semnalarea a fost respinsă." })
+      if (isDetailsDialogOpen && selectedReport?.id === reportId) setIsDetailsDialogOpen(false)
+      await loadReports()
     } catch (error) {
       console.error("Eroare la respingerea semnalării:", error)
       toast({
         title: "Eroare",
-        description: "Nu s-a putut respinge semnalarea",
+        description: error instanceof Error ? error.message : "Nu s-a putut respinge semnalarea.",
         variant: "destructive",
       })
     } finally {
@@ -289,6 +272,21 @@ export function HydrantReportsTable() {
 
           {selectedReport && (
             <div className="space-y-6">
+              {selectedReport.processing?.state === "sync_failed" && (
+                <div className="rounded-md border border-red-300 bg-red-50 p-3 text-sm text-red-800">
+                  <p className="font-semibold">Ultima aprobare a fost blocată</p>
+                  <p>
+                    Etapă: {selectedReport.processing.errorStage || "necunoscută"}.{" "}
+                    {selectedReport.processing.lastError || "Nu există detalii suplimentare."}
+                  </p>
+                  <p className="mt-1 text-xs">Puteți apăsa din nou „Aprobă” pentru reîncercare.</p>
+                </div>
+              )}
+              {selectedReport.processing?.snapshotStatus === "failed" && (
+                <div className="rounded-md border border-amber-300 bg-amber-50 p-3 text-sm text-amber-800">
+                  Datele au fost aprobate, dar snapshot-ul nu a pornit: {selectedReport.processing.snapshotError}
+                </div>
+              )}
               <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
                 <div>
                   <h3 className="text-sm font-medium text-gray-500">Informații semnalare</h3>

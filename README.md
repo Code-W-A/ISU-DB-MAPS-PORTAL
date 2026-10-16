@@ -76,9 +76,17 @@ GITHUB_REPO_OWNER=your-org-or-user
 GITHUB_REPO_NAME=your-repo
 GITHUB_WORKFLOW_FILE=generate-map-snapshots.yml
 GITHUB_WORKFLOW_REF=main
+
+# Repository-ul separat care conține hidranti.json
+GITHUB_DATA_TOKEN=github_pat_xxx
+GITHUB_DATA_REPO_OWNER=RaduPopescu95
+GITHUB_DATA_REPO_NAME=isudb_maps_data
+GITHUB_DATA_BRANCH=main
+GITHUB_HYDRANTS_PATH=hidranti.json
 ```
 
 Token-ul GitHub trebuie să poată porni workflow-uri (`actions/workflows:write` sau `repo + workflow`, în funcție de tipul token-ului).
+`GITHUB_DATA_TOKEN` trebuie să fie un token fine-grained limitat la repository-ul `isudb_maps_data`, cu permisiunea `Contents: Read and write`. Variabilele `GITHUB_DATA_*` sunt citite numai pe server și nu trebuie prefixate cu `NEXT_PUBLIC_`.
 
 ### Manifest format
 

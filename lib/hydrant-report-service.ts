@@ -188,7 +188,7 @@ export async function getAllHydrantReports(): Promise<HydrantReport[]> {
     return querySnapshot.docs.map((doc) => doc.data() as HydrantReport)
   } catch (error) {
     console.error("Eroare la obținerea semnalărilor:", error)
-    return []
+    throw error
   }
 }
 
@@ -201,7 +201,7 @@ export async function getHydrantReportsByStatus(status: HydrantReportStatus): Pr
     return querySnapshot.docs.map((doc) => doc.data() as HydrantReport)
   } catch (error) {
     console.error(`Eroare la obținerea semnalărilor cu status ${status}:`, error)
-    return []
+    throw error
   }
 }
 

@@ -7,7 +7,6 @@ import { Input } from "@/components/ui/input"
 import { Label } from "@/components/ui/label"
 import { Textarea } from "@/components/ui/textarea"
 import { Checkbox } from "@/components/ui/checkbox"
-import { RadioGroup, RadioGroupItem } from "@/components/ui/radio-group"
 import { toast } from "@/components/ui/use-toast"
 import { ToastAction } from "@/components/ui/toast"
 import { MdAdd, MdArrowBack, MdCheck, MdEdit, MdGpsFixed, MdOutlineTimer, MdUndo } from "react-icons/md"
@@ -19,6 +18,7 @@ import {
 import type { Hydrant } from "@/types/hydrant"
 import type { HydrantQuickReason, HydrantReportType } from "@/types/hydrant-report"
 import { useAuth } from "@/components/auth-provider"
+import { validateNewHydrant } from "@/lib/hydrant-report-processing"
 
 interface HydrantReportDialogProps {
   isOpen: boolean
@@ -229,21 +229,22 @@ export function HydrantReportDialog({ isOpen, onClose, coordinates, existingHydr
     return { lat, lng }
   }, [formData.Localizare?.Latitudine, formData.Localizare?.Longitudine])
 
-  const ensureAuthenticatedUser = () => {
+  const getAuthenticatedUser = () => {
     if (!user?.uid || !user?.email) {
       toast({
         title: "Eroare",
         description: "Trebuie să fiți autentificat pentru a trimite semnalări.",
         variant: "destructive",
       })
-      return false
+      return null
     }
 
-    return true
+    return { uid: user.uid, email: user.email }
   }
 
   const submitQuickExistingReason = async (reason: HydrantQuickReason) => {
-    if (!ensureAuthenticatedUser() || !existingHydrant) return
+    const authenticatedUser = getAuthenticatedUser()
+    if (!authenticatedUser || !existingHydrant) return
 
     const parsedCoordinates =
       getHydrantCoordinates(existingHydrant) ??
@@ -271,7 +272,7 @@ export function HydrantReportDialog({ isOpen, onClose, coordinates, existingHydr
     if (reason === "nefunctional") {
       quickDate["Stare hidrant"] = {
         Funcțional: undefined,
-        Nefuncțional: "da",
+        Nefuncțional: "X",
       }
     }
 
@@ -282,8 +283,8 @@ export function HydrantReportDialog({ isOpen, onClose, coordinates, existingHydr
         tip: "modificare",
         hidrantId: existingHydrantWithId?.id,
         date: quickDate,
-        userId: user.uid,
-        userEmail: user.email,
+        userId: authenticatedUser.uid,
+        userEmail: authenticatedUser.email,
         coordonate: {
           latitude: parsedCoordinates.lat,
           longitude: parsedCoordinates.lng,
@@ -327,7 +328,8 @@ export function HydrantReportDialog({ isOpen, onClose, coordinates, existingHydr
   }
 
   const handleCancelQuickReport = async (targetReportId?: string) => {
-    if (!ensureAuthenticatedUser()) return
+    const authenticatedUser = getAuthenticatedUser()
+    if (!authenticatedUser) return
 
     const reportId = targetReportId ?? submittedQuickReport?.id
     if (!reportId) return
@@ -344,7 +346,7 @@ export function HydrantReportDialog({ isOpen, onClose, coordinates, existingHydr
 
     setIsCancellingQuickReport(true)
     try {
-      const cancelled = await cancelHydrantReport(reportId, user.uid)
+      const cancelled = await cancelHydrantReport(reportId, authenticatedUser.uid)
       if (!cancelled) {
         toast({
           title: "Anulare imposibilă",
@@ -377,7 +379,8 @@ export function HydrantReportDialog({ isOpen, onClose, coordinates, existingHydr
   }
 
   const handleSaveQuickComment = async () => {
-    if (!ensureAuthenticatedUser() || !submittedQuickReport) return
+    const authenticatedUser = getAuthenticatedUser()
+    if (!authenticatedUser || !submittedQuickReport) return
 
     if (!quickComment.trim()) {
       toast({
@@ -390,7 +393,7 @@ export function HydrantReportDialog({ isOpen, onClose, coordinates, existingHydr
 
     setIsSavingQuickComment(true)
     try {
-      const updated = await updateHydrantReportComment(submittedQuickReport.id, user.uid, quickComment)
+      const updated = await updateHydrantReportComment(submittedQuickReport.id, authenticatedUser.uid, quickComment)
       if (!updated) {
         toast({
           title: "Actualizare eșuată",
@@ -419,7 +422,8 @@ export function HydrantReportDialog({ isOpen, onClose, coordinates, existingHydr
   }
 
   const handleSubmitRapidNewHydrant = async () => {
-    if (!ensureAuthenticatedUser()) return
+    const authenticatedUser = getAuthenticatedUser()
+    if (!authenticatedUser) return
     if (!rapidCoordinates) {
       toast({
         title: "Coordonate lipsă",
@@ -443,13 +447,13 @@ export function HydrantReportDialog({ isOpen, onClose, coordinates, existingHydr
       Stradă: "Necunoscut",
       Reper: "",
       TipHidrant: {
-        Suprateran: rapidHydrantType === "suprateran" ? "da" : undefined,
-        Subteran: rapidHydrantType === "subteran" ? "da" : undefined,
+        Suprateran: rapidHydrantType === "suprateran" ? "X" : undefined,
+        Subteran: rapidHydrantType === "subteran" ? "X" : undefined,
         TipB: undefined,
       },
       "Stare hidrant": {
-        Funcțional: rapidHydrantState === "functional" ? "da" : undefined,
-        Nefuncțional: rapidHydrantState === "nefunctional" ? "da" : undefined,
+        Funcțional: rapidHydrantState === "functional" ? "X" : undefined,
+        Nefuncțional: rapidHydrantState === "nefunctional" ? "X" : undefined,
       },
       Localizare: {
         Latitudine: `${rapidCoordinates.lat}`,
@@ -462,8 +466,8 @@ export function HydrantReportDialog({ isOpen, onClose, coordinates, existingHydr
       const result = await addHydrantReport({
         tip: "nou",
         date: rapidHydrantData,
-        userId: user.uid,
-        userEmail: user.email,
+        userId: authenticatedUser.uid,
+        userEmail: authenticatedUser.email,
         coordonate: {
           latitude: rapidCoordinates.lat,
           longitude: rapidCoordinates.lng,
@@ -491,12 +495,14 @@ export function HydrantReportDialog({ isOpen, onClose, coordinates, existingHydr
   }
 
   const handleSubmitAdvanced = async () => {
-    if (!ensureAuthenticatedUser()) return
+    const authenticatedUser = getAuthenticatedUser()
+    if (!authenticatedUser) return
 
-    if (reportType === "nou" && (!formData.Județ || !formData.Localitate || !formData.Stradă)) {
+    const validationError = reportType === "nou" ? validateNewHydrant(formData) : null
+    if (validationError) {
       toast({
         title: "Eroare",
-        description: "Completați județ, localitate și stradă.",
+        description: validationError,
         variant: "destructive",
       })
       return
@@ -518,8 +524,8 @@ export function HydrantReportDialog({ isOpen, onClose, coordinates, existingHydr
         tip: reportType,
         hidrantId: reportType === "modificare" ? existingHydrantWithId?.id : undefined,
         date: formData,
-        userId: user.uid,
-        userEmail: user.email,
+        userId: authenticatedUser.uid,
+        userEmail: authenticatedUser.email,
         coordonate: {
           latitude: advancedCoordinates.lat,
           longitude: advancedCoordinates.lng,
@@ -749,16 +755,7 @@ export function HydrantReportDialog({ isOpen, onClose, coordinates, existingHydr
             {!isExistingHydrant && (
               <div className="space-y-2">
                 <Label>Tip semnalare</Label>
-                <RadioGroup value={reportType} onValueChange={(value) => setReportType(value as HydrantReportType)} className="flex space-x-4">
-                  <div className="flex items-center space-x-2">
-                    <RadioGroupItem value="nou" id="report-type-new" />
-                    <Label htmlFor="report-type-new">Hidrant nou</Label>
-                  </div>
-                  <div className="flex items-center space-x-2">
-                    <RadioGroupItem value="modificare" id="report-type-edit" />
-                    <Label htmlFor="report-type-edit">Modificare hidrant</Label>
-                  </div>
-                </RadioGroup>
+                <p className="rounded-md border bg-muted/40 px-3 py-2 text-sm">Hidrant nou</p>
               </div>
             )}
 
@@ -831,7 +828,8 @@ export function HydrantReportDialog({ isOpen, onClose, coordinates, existingHydr
                           ...formData,
                           TipHidrant: {
                             ...formData.TipHidrant,
-                            Suprateran: checked ? "da" : undefined,
+                            Suprateran: checked ? "X" : undefined,
+                            Subteran: checked ? undefined : formData.TipHidrant?.Subteran,
                           },
                         })
                       }
@@ -850,7 +848,8 @@ export function HydrantReportDialog({ isOpen, onClose, coordinates, existingHydr
                           ...formData,
                           TipHidrant: {
                             ...formData.TipHidrant,
-                            Subteran: checked ? "da" : undefined,
+                            Subteran: checked ? "X" : undefined,
+                            Suprateran: checked ? undefined : formData.TipHidrant?.Suprateran,
                           },
                         })
                       }
@@ -869,7 +868,7 @@ export function HydrantReportDialog({ isOpen, onClose, coordinates, existingHydr
                           ...formData,
                           TipHidrant: {
                             ...formData.TipHidrant,
-                            TipB: checked ? "da" : undefined,
+                            TipB: checked ? "X" : undefined,
                           },
                         })
                       }
@@ -893,7 +892,7 @@ export function HydrantReportDialog({ isOpen, onClose, coordinates, existingHydr
                           ...formData,
                           "Stare hidrant": {
                             ...formData["Stare hidrant"],
-                            Funcțional: checked ? "da" : undefined,
+                            Funcțional: checked ? "X" : undefined,
                             Nefuncțional: checked ? undefined : formData["Stare hidrant"]?.Nefuncțional,
                           },
                         })
@@ -913,7 +912,7 @@ export function HydrantReportDialog({ isOpen, onClose, coordinates, existingHydr
                           ...formData,
                           "Stare hidrant": {
                             ...formData["Stare hidrant"],
-                            Nefuncțional: checked ? "da" : undefined,
+                            Nefuncțional: checked ? "X" : undefined,
                             Funcțional: checked ? undefined : formData["Stare hidrant"]?.Funcțional,
                           },
                         })
@@ -935,7 +934,7 @@ export function HydrantReportDialog({ isOpen, onClose, coordinates, existingHydr
                     setFormData({
                       ...formData,
                       Localizare: {
-                        ...formData.Localizare,
+                        Longitudine: formData.Localizare?.Longitudine || "",
                         Latitudine: e.target.value,
                       },
                     })
@@ -953,7 +952,7 @@ export function HydrantReportDialog({ isOpen, onClose, coordinates, existingHydr
                     setFormData({
                       ...formData,
                       Localizare: {
-                        ...formData.Localizare,
+                        Latitudine: formData.Localizare?.Latitudine || "",
                         Longitudine: e.target.value,
                       },
                     })

@@ -20,6 +20,7 @@ import { Checkbox } from "@/components/ui/checkbox"
 
 // Adăugăm un import pentru useMediaQuery
 import { useMediaQuery } from "@/hooks/use-media-query"
+import { validateNewHydrant } from "@/lib/hydrant-report-processing"
 
 // Modificăm funcția HydrantsTable pentru a include detectarea dispozitivelor mobile
 export function HydrantsTable() {
@@ -148,7 +149,8 @@ export function HydrantsTable() {
     }
 
     try {
-      await updateHydrantInFirestore(currentHydrant.id, currentHydrant)
+      const updated = await updateHydrantInFirestore(currentHydrant.id, currentHydrant)
+      if (!updated) throw new Error("Firestore nu a confirmat actualizarea hidrantului.")
 
       // Actualizăm lista locală
       setHydrants(hydrants.map((h) => (h.id === currentHydrant.id ? currentHydrant : h)))
@@ -207,6 +209,12 @@ export function HydrantsTable() {
           Latitudine: newHydrant.Localizare?.Latitudine || "",
           Longitudine: newHydrant.Localizare?.Longitudine || "",
         },
+      }
+
+      const validationError = validateNewHydrant(completeHydrant)
+      if (validationError) {
+        toast({ title: "Eroare", description: validationError, variant: "destructive" })
+        return
       }
 
       const newId = await addHydrantToFirestore(completeHydrant)
@@ -495,7 +503,8 @@ export function HydrantsTable() {
                         ...newHydrant,
                         TipHidrant: {
                           ...newHydrant.TipHidrant,
-                          Suprateran: checked ? "da" : undefined,
+                          Suprateran: checked ? "X" : undefined,
+                          Subteran: checked ? undefined : newHydrant.TipHidrant?.Subteran,
                         },
                       })
                     }
@@ -514,7 +523,8 @@ export function HydrantsTable() {
                         ...newHydrant,
                         TipHidrant: {
                           ...newHydrant.TipHidrant,
-                          Subteran: checked ? "da" : undefined,
+                          Subteran: checked ? "X" : undefined,
+                          Suprateran: checked ? undefined : newHydrant.TipHidrant?.Suprateran,
                         },
                       })
                     }
@@ -533,7 +543,7 @@ export function HydrantsTable() {
                         ...newHydrant,
                         TipHidrant: {
                           ...newHydrant.TipHidrant,
-                          TipB: checked ? "da" : undefined,
+                          TipB: checked ? "X" : undefined,
                         },
                       })
                     }
@@ -557,7 +567,7 @@ export function HydrantsTable() {
                         ...newHydrant,
                         "Stare hidrant": {
                           ...newHydrant["Stare hidrant"],
-                          Funcțional: checked ? "da" : undefined,
+                          Funcțional: checked ? "X" : undefined,
                           Nefuncțional: checked ? undefined : newHydrant["Stare hidrant"]?.Nefuncțional,
                         },
                       })
@@ -577,7 +587,7 @@ export function HydrantsTable() {
                         ...newHydrant,
                         "Stare hidrant": {
                           ...newHydrant["Stare hidrant"],
-                          Nefuncțional: checked ? "da" : undefined,
+                          Nefuncțional: checked ? "X" : undefined,
                           Funcțional: checked ? undefined : newHydrant["Stare hidrant"]?.Funcțional,
                         },
                       })
@@ -599,7 +609,7 @@ export function HydrantsTable() {
                   setNewHydrant({
                     ...newHydrant,
                     Localizare: {
-                      ...newHydrant.Localizare,
+                      Longitudine: newHydrant.Localizare?.Longitudine || "",
                       Latitudine: e.target.value,
                     },
                   })
@@ -617,7 +627,7 @@ export function HydrantsTable() {
                   setNewHydrant({
                     ...newHydrant,
                     Localizare: {
-                      ...newHydrant.Localizare,
+                      Latitudine: newHydrant.Localizare?.Latitudine || "",
                       Longitudine: e.target.value,
                     },
                   })
@@ -713,7 +723,8 @@ export function HydrantsTable() {
                           ...currentHydrant,
                           TipHidrant: {
                             ...currentHydrant.TipHidrant,
-                            Suprateran: checked ? "da" : undefined,
+                            Suprateran: checked ? "X" : undefined,
+                            Subteran: checked ? undefined : currentHydrant.TipHidrant?.Subteran,
                           },
                         })
                       }
@@ -732,7 +743,8 @@ export function HydrantsTable() {
                           ...currentHydrant,
                           TipHidrant: {
                             ...currentHydrant.TipHidrant,
-                            Subteran: checked ? "da" : undefined,
+                            Subteran: checked ? "X" : undefined,
+                            Suprateran: checked ? undefined : currentHydrant.TipHidrant?.Suprateran,
                           },
                         })
                       }
@@ -751,7 +763,7 @@ export function HydrantsTable() {
                           ...currentHydrant,
                           TipHidrant: {
                             ...currentHydrant.TipHidrant,
-                            TipB: checked ? "da" : undefined,
+                            TipB: checked ? "X" : undefined,
                           },
                         })
                       }
@@ -775,7 +787,7 @@ export function HydrantsTable() {
                           ...currentHydrant,
                           "Stare hidrant": {
                             ...currentHydrant["Stare hidrant"],
-                            Funcțional: checked ? "da" : undefined,
+                            Funcțional: checked ? "X" : undefined,
                             Nefuncțional: checked ? undefined : currentHydrant["Stare hidrant"]?.Nefuncțional,
                           },
                         })
@@ -795,7 +807,7 @@ export function HydrantsTable() {
                           ...currentHydrant,
                           "Stare hidrant": {
                             ...currentHydrant["Stare hidrant"],
-                            Nefuncțional: checked ? "da" : undefined,
+                            Nefuncțional: checked ? "X" : undefined,
                             Funcțional: checked ? undefined : currentHydrant["Stare hidrant"]?.Funcțional,
                           },
                         })
@@ -805,6 +817,33 @@ export function HydrantsTable() {
                       Nefuncțional
                     </Label>
                   </div>
+                </div>
+              </div>
+
+              <div className="space-y-2 md:col-span-2">
+                <Label>Probleme raportate</Label>
+                <p className="text-xs text-muted-foreground">Debifați o avertizare după ce problema a fost remediată.</p>
+                <div className="grid gap-2 pt-1 sm:grid-cols-3">
+                  {(["Acces blocat", "Lipsește capac", "Nu se găsește"] as const).map((problem) => (
+                    <div key={problem} className="flex items-center gap-2">
+                      <Checkbox
+                        id={`edit-problem-${problem}`}
+                        checked={!!currentHydrant["Probleme raportate"]?.[problem]}
+                        onCheckedChange={(checked) =>
+                          setCurrentHydrant({
+                            ...currentHydrant,
+                            "Probleme raportate": {
+                              ...currentHydrant["Probleme raportate"],
+                              [problem]: checked ? "X" : undefined,
+                            },
+                          })
+                        }
+                      />
+                      <Label htmlFor={`edit-problem-${problem}`} className="cursor-pointer font-normal">
+                        {problem}
+                      </Label>
+                    </div>
+                  ))}
                 </div>
               </div>
 
