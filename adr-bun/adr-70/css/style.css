@@ -1,0 +1,101 @@
+
+    .distanta {
+        background-color: rgb(186, 9, 9);
+        color: white;
+        padding: 5px 10px;
+        border-radius: 10px;
+        display: inline-block;
+    }
+
+    body {
+        font-family: 'Arial', sans-serif;
+        background-color: #f4f4f9;
+        margin: 0;
+        padding: 0;
+        color: #333;
+    }
+    header {
+        background-color: #66868d;
+        color: rgb(255, 255, 255);
+        text-align: center;
+        padding: 10px 0;
+        width: 90%;
+        max-width: 900px;
+        margin: 0 auto;
+        border-radius: 10px;
+        
+    }
+    header h1 {
+        font-size: 1.5em;
+        margin: 0;
+    }
+    .container {
+        max-width: 800px; /* Keeps it responsive and not too wide */
+        width: 90%; /* Ensures it doesn't stretch too much on small screens */
+        margin: 5px auto; /* Centers the content */
+        padding: 10px;
+        background-color: white;;
+        border-radius: 10px; /* More rounded edges for a modern look */
+        box-shadow: 0 2px 10px rgba(0, 0, 0, 0.1); /* Adds a subtle shadow */
+    }
+    .section {
+        margin-bottom: 10px;
+        padding: 10px;
+        padding-bottom: 1px;
+        background-color: #00000030;
+        border-radius: 10px;
+        box-shadow: 0 2px 5px rgba(0, 0, 0, 0.1);
+    }
+    h2 {
+        color: #00796b;
+        border-bottom: 2px solid #00796b;
+        padding-bottom: 5px;
+        margin-top: 3px;
+        margin-bottom: 5px;
+    }
+    ul {
+        list-style-type: none;
+        padding-left: 0;
+    }
+    li {
+        margin-bottom: 10px;
+        font-size: 1.1em;
+    }
+    .warning {
+        background-color: #ffcc00;
+        color: #b56b00;
+        padding: 10px;
+        border-radius: 20px;
+        margin-bottom: 10px;
+        font-weight: bold;
+    }
+    .highlight {
+        color: rgb(186, 9, 9);
+        font-weight: bold;
+    }
+    footer {
+        background-color: #333;
+        color: white;
+        text-align: center;
+        padding: 10px 0;
+        width: 90%; /* Match container width */
+        max-width: 900px; /* Match container max-width */
+        margin: 20px auto; /* Center the footer */
+        border-radius: 20px; /* Consistent with header and container */
+    }
+    
+    /* Responsive adjustments */
+@media (max-width: 600px) {
+    .container, header, footer {
+        width: 95%; /* Use more width on small screens */
+        border-radius: 10px; /* Smaller rounded edges for compact look */
+        padding: 5px;
+    }
+
+    header h1 {
+        font-size: 1.5em; /* Slightly smaller text for better fit */
+    }
+}
+    .icon {
+        margin-right: 10px;
+    }

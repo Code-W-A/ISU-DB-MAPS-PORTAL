@@ -1,0 +1,746 @@
+<!DOCTYPE html>
+<html lang="ro">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Îndrumător</title>
+    <link rel="stylesheet" href="style.css">
+    <style>
+        .fixed-top {
+            position: fixed;
+            top: 0;
+            left: 0;
+            width: 100%;
+            z-index: 1000;
+            background-color: white;
+            padding: 10px;
+            box-shadow: 0 2px 5px rgba(0, 0, 0, 0.2);
+            transition: all 0.3s ease; /* Optional: Smooth transition */
+        }
+    </style>
+</head>
+<body>
+
+    <div class="container">
+        <div class="main-title"> <b><p>ISU DB</p> INDRUMĂTOR SMISU</b>  </div>
+
+        <div class="section">
+            <h1 id="togglelocul">1. Locul focarului <span class="arrow">&#9654;</span></h1>
+            <div id="loculContent" class="hidden">
+                <input type="text" id="searchInput0" placeholder="Cautare...">
+                <ul id="termsList0"></ul>
+            </div>
+        </div>
+        <!-- Secțiunea Sursa -->
+        <div class="section">
+            <h1 id="toggleSursa">2. Sursa probabilă de aprindere <span class="arrow">&#9654;</span></h1>
+            <div id="sursaContent" class="hidden">
+                <input type="text" id="searchInput1" placeholder="Cautare...">
+                <ul id="termsList1"></ul>
+            </div>
+        </div>
+
+        <!-- Secțiunea Mijlocul -->
+        <div class="section">
+            <h1 id="toggleMijlocul">3. Mijlocul care putea produce aprinderea <span class="arrow">&#9654;</span></h1>
+            <div id="mijloculContent" class="hidden">
+                <input type="text" id="searchInput2" placeholder="Cautare...">
+                <ul id="termsList2"></ul>
+            </div>
+        </div>
+
+        <!-- Secțiunea Primul material care a ars -->
+        <div class="section">
+            <h1 id="toggleMaterial">4. Primul material care a ars <span class="arrow">&#9654;</span></h1>
+            <div id="materialContent" class="hidden">
+                <input type="text" id="searchInput3" placeholder="Cautare..." onfocus="window.scrollTo(0, 0);">
+                <ul id="termsList3"></ul>
+            </div>
+        </div>
+
+        <!-- Secțiunea Împrejurarea determinantă -->
+        <div class="section">
+            <h1 id="toggleImprejurare">5. Împrejurarea determinantă <span class="arrow">&#9654;</span></h1>
+            <div id="imprejurareContent" class="hidden">
+                <input type="text" id="searchInput4" placeholder="Cautare...">
+                <ul id="termsList4"></ul>
+            </div>
+        </div>
+
+        <button id="generateSource">Generează</button>
+
+        <div id="selectedTerms" class="selected-terms"></div>
+    </div>
+
+    <script>
+        const terms1 = [
+    "Nu este cazul 0",
+"Arc sau scanteie electrica (si de la sudura electrica) 1",
+"Efectul termic al curentului electric 2",
+"Scurtcircuit electric 3",
+"Electricitate statica 4",
+"Flacara (focuri in aer liber, chibrit, flacari de la aparate termice, etc.) 5",
+"Jar sau scantei 6",
+"Efect termic (caldura prin contact sau radiatie, frecare etc.) 7",
+"Scantei mecanice 8",
+"Autoaprindere 9",
+"Reactie chimica, scanteie generata de reactie chimica 10",
+"Explozie, efectul termic al unor substante incendiare aprinse 11",
+"Trasnet, fulger globular 12",
+"Alte surse (radiatie solara, energie nucleara, caderea unor corpuri din atmosfera) 13",
+"Propagat de la un alt incendiu 14",
+"In curs de stabilire 15",
+"Nedeterminata 16"
+
+
+];
+        const terms2 = [
+"Aparate electrocasnice/electronice",
+"Aprinzator electric 1",
+"Aspirator praf 2",
+"Fier de calcat 3",
+"Filtru de cafea 4",
+"Frigider 5",
+"Incalzitor pentru apa sau alte lichide 6",
+"Masina de barbierit 7",
+"Masina de spalat 8",
+"Aparat aer conditionat 9",
+"Radio, televizor 10",
+"Combina, video 11",
+"Robot de bucatarie 12",
+"Alte tipuri de aparate electrocasnice/electronice (video, aparat de inregistrare sau redare) 13",
+"Mijloace de iluminat electrice",
+"Bec 14",
+"Tub fluorescent 15",
+"Firma luminoasa 16",
+"Ghirlanda 17",
+"Lampadar 18",
+"Proiector (reflector) 19",
+"Lampa de iluminat 20",
+"Lanterna 21",
+"Orga de lumini 22",
+"Alte aparate de iluminat 23",
+"Aparate de incalzit electrice",
+"Aeroterma 24",
+"Calorifer 25",
+"Radiator (eleveza) 26",
+"Resou 27",
+"Boiler 28",
+"Aparat de gatit, cuptor cu microunde, friteuza 29",
+"Patura, perna electrica 30",
+"Incalzire prin diferite tipuri de radiatii (ultraviolete, infrarosii) 31",
+"Alte tipuri de aparate electrice de incalzire (centrala termica, clociatoare) 32",
+"Motoare, aparate de prelucrare sau de transf. a curentului electric. Generator electric 33",
+"Motor electric 34",
+"Transformator electric (autotransformator) 35",
+"Redresor 36",
+"Acumulator, baterie 37",
+"Alternator 38",
+"Alte motoare sau aparate de prelucrare a curentului electric 39",
+"Alte aparate electrice/electronice",
+"Computer de bord 40",
+"Aparat de proiectie (filme, diafilme, diapozitive) 41",
+"Aparat medical 42",
+"Aparat muzical 43",
+"Dispozitiv electric de sudura, taiere, lipire 44",
+"Copiator, imprimanta, fax 45",
+"Jucarie electrica, chitara electrica 46",
+"Masina de calcul 47",
+"Masina de scris 48",
+"Calculator electric 49",
+"Alte aparate electrice (aparat de aer conditionat, etc) 50",
+"Conductori si aparate de intrerupere si control",
+"Cablu electric, conductor electric 51",
+"Comutator, intrerupator 52",
+"Releu, contactor 53",
+"Contor 54",
+"Cutie de conexiuni, manson, doza 55",
+"Tablou de distributie 56",
+"Tablou (aparat) de masura, comanda si control 57",
+"Priza de curent 58",
+"Termostat 59",
+"Instalatie electrica volanta 60",
+"Alt tip de conductori sau aparate de intrerupere si control 61",
+"Sisteme care produc electricitate statica",
+"Sisteme de depozitare, vehiculare si transport lichide combustibile 62",
+"Sisteme de depozitare, vehiculare si transport pulberi combustibile 63",
+"Utilaj prelucr. mat. si subst. ce se incarca electrostatic (malaxor,valt,etc) 64",
+"Sisteme de transmitere a miscarii (curele de transmisie si altele) 65",
+"Spalare in lichide combustibile 66",
+"Echipament ce se incarca electrostatic (imbracaminte, incaltaminte) 67",
+"Unelte si scule ce se incarca electrostatic 68",
+"Mijloace cu flacara",
+"Bricheta 69",
+"Chibrituri 70",
+"Lampa de iluminat cu combustibil lichid 71",
+"Lampa cu combustibil gazos 72",
+"Lampa de gatit cu combustibil lichid 73",
+"Spirtiera 74",
+"Lumanare 75",
+"Torta, faclie, festila, felinar 76",
+"Alte mijloace folosite pentru iluminare sau aprindere 77",
+"Foc in aer liber",
+"Foc in aer liber 78",
+"Tigara",
+"Tigara 79",
+"Aparate de incalzit centrale de incalzire cu combustibil solid (lemn, carbune etc.) 80",
+"Centrale de incalzire cu combustibil lichid/gazos (gaze, motorina etc.) 81",
+"Semineu 82",
+"Cuptor 83",
+"Masina de gatit pentru bucatarie (aragaz) 84",
+"Soba cu acumulare de caldura (caramida, teracota) 85",
+"Soba fara acumulare de caldura (metalica) 86",
+"Afumatorie 87",
+"Cazan de topit bitum 88",
+"Clociatoare 89",
+"Cubilou 90",
+"Uscator 91",
+"Dispozitiv pentru sudura, taiere, lipire cu gaze sau lichide combustibile 92",
+"Alte aparate de incalzit (cuptor tehnologic) 93",
+"Utilaje si sisteme de actiune desprafuitor 94",
+"Elevator 95",
+"Fierastrau mecanic 96",
+"Grup electrogen 97",
+"Locomotiva 98",
+"Motor cu ardere interna 99",
+"Motor cu aburi 100",
+"Motor cu reactie 101",
+"Motor cu turbina (turboreactor) 102",
+"Masina agricola 103",
+"Sistem de actiune banda transportoare 104",
+"Alte tipuri de utilaje si sisteme de actiune 105",
+"Metale (materiale) care ard si scurgeri ale materialelor topite",
+"Material topit (metal, sticla, masa plastica etc.) 106",
+"Material incandescent (metal, lemn, carbune etc.) jar, cenusa 107",
+"Alte metale (materiale) care ard sau scurgeri de materii topite 108",
+"Conducte (canale) pentru agent termic si ventilare",
+"Burlan (teava) metalic 109",
+"Canal (cos) de fum 110",
+"Conducta de aer cald 111",
+"Conducta de apa calda sau supraincalzita 112",
+"Canal de aerisire, ventilatie, conditionare mediu 113",
+"Canal de incalzire 114",
+"Conducta de abur 115",
+"Conducta tehnologica cu lichide sau gaze incalzite 116",
+"Toba esapament 117",
+"Alte tipuri de conducte (canale) 118",
+"Caldura solara",
+"Caldura solara directa, acumulata, concentrata sau reflectata de obiecte 119",
+"Produse ce se pot autoaprinde",
+"Metale (ex: sodiu, potasiu, magneziu, etc) 120",
+"Substanțe chimice solide 121",
+"Lichide combustibile 122",
+" gaze combustibile 123",
+"Seminte 124",
+"Uleiuri 125",
+"Plante tehnice, furaje, industriale 126",
+"Rumegus, pulberi, prafuri si faina combustibila 127",
+"Fibre si fire vegetale sintetice, artificiale, de origine animala 128",
+"Grasimi si alte substante grase 129",
+"Carbune 130",
+"Carpe, deșeuri textile 131",
+"Alte materiale si substante 132",
+"Produse si substante care pot produce explozii",
+"Materiale explozive (munitie, artificii, pocnitori, explozivi, etc.) 133",
+"Amestecuri de pulberi, gaze sau vapori cu aerul 134",
+"Trasnet",
+"Trasnet direct 135",
+"Trasnet prin instalatia de paratrasnet 136",
+"Surse nucleare",
+"Reactor cercetare 137",
+"Reactor energetic 138",
+"Arma nucleara 139",
+"Alta sursa nucleara 140",
+"Alte mijloace",
+"Alte mijloace care pot produce aprinderea 141",
+"Nedeterminate",
+"Nedeterminate 142",
+"In curs de stabilire",
+"In curs de stabilire 143",
+"Nu este cazul 0"
+
+
+];
+
+        const terms3 = [
+"Gaze combustibile",
+"Acetilena 1",
+"Butan, propan 2",
+"Metan 3",
+"Hidrogen 4",
+"Gaz de sonda 5",
+"Alte gaze combustibile 7",
+"Lichide combustibile (sau vapori)",
+"Benzina 8",
+"Motorina, pacura 9",
+"Petrol 10",
+"Titei 11",
+"Produse chimice de curatat 12",
+"Gazolina, solvenți 13",
+"Alcool si produse pe baza de alcool 14",
+"Ulei 15",
+"Lacuri 16",
+"Vopsele 17",
+"Adezivi 18",
+"Substanțe pentru deratizari, dezinfecții, etc. 19",
+"Alte lichide combustibile 20",
+"Produse chimice solide",
+"Mase plastice (articole din mase plastice, izolație cabluri) 21",
+"Naftalina 22",
+"Linoleum 23",
+"Cauciuc (articole de cauciuc, izolație cabluri din cauciuc) 24",
+"Vata minerala 25",
+"Parafina, ceara 26",
+"Ingrasaminte chimice 27",
+"Bitum, asfalt 28",
+"Panza, carton asfaltat 29",
+"Explozivi 30",
+"Alte produse chimice 31",
+"Pulberi combustibile",
+"Pulberi metalice 32",
+"Pulberi de carbune 33",
+"Pulberi de lemn 34",
+"Pulberi de textile 35",
+"Pulberi de faina 36",
+"Pulberi de produse chimice 37",
+"Alte pulberi combustibile 38",
+"Materiașe combustibile solide",
+"Lemn (copac, pomi, bușteni, cherestea de foc, mobilier, ambalaj, rumeguș) 39",
+"Hârtie și carton (sul, balot, vrac, stiva, articole de hartie, deșeuri, etc) 40",
+"Textile naturale (lana, bumbac, in, iuta, canepa, sub forma de fire, vrac) 41",
+"Textile artificiale si chimice (fire, fibre, baloti, vrac, ambalaj, deșeuri) 42",
+"Piele naturala sau sintetica (sub forma de vrac, baloti, imbracaminte, etc) 43",
+"Par de origine animala (sub forma de vrac, baloti, articole din par, etc) 44",
+"Cereale (sub forma de cultura, recolta, semințe, pleava, miriste, deșeuri, etc) 45",
+"Plante tehnice (in, canepa, sub forma de cultura, semințe, ulei, tutun, deșeuri, etc) 46",
+"Plante furajere (fan, lucerna, trifoi, sub forma de vrac, sira, capite, deșeuri) 47",
+"Carbune (antracit, cocs, huila, turba, lignit) 48",
+"Grasime (untura, slanina) 49",
+"Deșeuri (nereutilizabile)",
+"Funingine 50",
+"Grăsimi depuse pe tubulatura 51",
+"Frunze, cetina și scoarță de copaci 52",
+"Carpe imbibate in ulei și alte produse 53",
+"Reziduuri de decantare 54",
+"Span și aschii metalice 55",
+"Gunoi, reziduuri menajere 56",
+"Maracinis, lastaris și alta vegetatie uscata 57",
+"Alte deșeuri nereutilizabile 58",
+"Alte materiale 59"
+
+];
+
+       const terms0 = [ 
+       "Nu este cazul 0",
+"Dormitor 1",
+"Bucatarie 2",
+"Camera de zi, sufragerie 3",
+"Pod, mansarda, acoperis 4",
+"Casa scarii 5",
+"Casa ascensor 6",
+"Coridor, vestibul, hol, balcon 7",
+"Grup sanitar, baie 8",
+"Debara, camara 9",
+"Pivnita, subsol 10",
+"Centrala (punct) termica 11",
+"Lift 12",
+"Ghena de ventilatie, climatizare 13",
+"Garaj 14",
+"Spalatorie, uscatorie 15",
+"Curte, gradina 16",
+"Distilerie alcool 17",
+"Magazie, sopron, baraca materiale, afumatorie 18",
+"Birou, sediu de firma 19",
+"Vestiar 20",
+"Incapere pentru cazare (inclusiv cresa, camin) 21",
+"Oficiu 22",
+"Receptie, cabina portar 23",
+"Farmacie 24",
+"Sala pentru bolnavi, sala de consultatie 25",
+"Laborator analize 26",
+"Salon frizerie, coafura, cosmetica 27",
+"Sala de intrunire, conferinte, receptii, tribunal, protocol 28",
+"Sala de spectacol (festivitate) 29",
+"Scena, subscena 30",
+"Fosa orchestra 31",
+"Orga de lumini si sunet, cabina de proiectie 32",
+"Studio de inregistrari 33",
+"Foaier, garderoba 34",
+"Sala de asteptare, ghiseuri, case de schimb valutar 35",
+"Sala de invatamant (clasa de scoala), aula universitara 36",
+"Sala de sport scoala, liceu, facultate 37",
+"Galerie de arta, muzeu 38",
+"Arhiva, biblioteca 39",
+"Lacas de cult (biserici, manastiri) 40",
+"Loc de expunere marfa (vitrina) 41",
+"Incapere pentru vanzare 42",
+"Chiosc 43",
+"Piata, tarabe 44",
+"Sala de mese, restaurant, bar, cantina, cofetarie 45",
+"Sala de jocuri mecanice, local de distractie, discoteca 46",
+"Camera frigorifica, magazie de alimente 47",
+"Gogoserie, patiserie, saormerie, rotisor 48",
+"Centrala telefonica 50",
+"Sala calculatoare, sala internet 51",
+"Baraca santier 52",
+"Santier (organizare de santier sau lucrari de constructii) 53",
+"Cazan de topit bitum, utilaje santier 54",
+"Atelier scoala 55",
+"Atelier de creatie, proiectare 56",
+"Atelier de intretinere 57",
+"Atelier de productie 58",
+"Atelier de reparatii, service 59",
+"Alte ateliere 60",
+"Laboratoare 61",
+"Brutarie 62",
+"Moara 63",
+"Abator, carmangerie 64",
+"Camera de comanda si control 65",
+"Generator, transformator electric 66",
+"Tablou electric 67",
+"Statie de transformatoare, releu comunicatii 68",
+"Instalatii tehnologice 69",
+"Presa de ulei 70",
+"Turnatorie 71",
+"Gospodarii de cabluri 72",
+"Masini si utilaje 73",
+"Banda transportoare 74",
+"Compresoare 75",
+"Sonda, platforma foraj, extractie titei, gaze naturale 76",
+"Exploatari miniere 77",
+"Conducte de transport 78",
+"Conducte tehnologice 79",
+"Sala de masini, sala pompare 80",
+"Hala de productie 81",
+"Hala gatere 82",
+"Tipografii, spatii de multiplicat si copiat 83",
+"Statie pilot, laborator de incercare 84",
+"Statie de alimentare cu benzina, motorina, gpl 85",
+"Statie de dezbenzinare 86",
+"Statie de imbuteliere 87",
+"Rezervoare, buncar, batal 88",
+"Depozit general (mixt) 89",
+"Depozit de materiale (substante) combustibile solide 90",
+"Depozit de materiale (substante) combustibile lichide 91",
+"Depozit de materiale (substante) combustibile gazoase 92",
+"Depozit de materiale (substante) explozibile 93",
+"Depozit substante toxice sau radioactive 94",
+"Depozit de produse alimentare 95",
+"Container 96",
+"Depozit furaje 97",
+"Adapost animale (grajd, staul, saivan, stana) 98",
+"Adapost de pasari 99",
+"Crescatorie de albine 100",
+"Crescatorie de peste 101",
+"Dispensar veterinar 102",
+"Lanuri 103",
+"Miriste 104",
+"Masini si utilaje agricole 105",
+"Moara pentru preparare furaje 106",
+"Pepiniere 107",
+"Plantatie (livada) pomicola sau viticola 108",
+"Sere, ciupercarie 109",
+"Siloz, patul cereale, hambare, sure 110",
+"Uscatoare cereale, fructe, legume 111",
+"Pajiste, pasune ocol silvic 112",
+"Padure - plantatie 113",
+"Padure - litiera 114",
+"Padure - coronament 115",
+"Izlazuri, pasuni comunale 116",
+"Depouri, remize, hangare 117",
+"Locomotiva 118",
+"Mijloc de transport marfuri 119",
+"Mijloc de transport persoane (inclusiv avioane, nave maritime, telecabina) 120",
+"Parkinguri si garaje colective, gari, autogari 121",
+"Rampe de incarcare-descarcare 122",
+"Poduri, tuneluri, viaducte, baraje, pasaje 123",
+"Gradina, parc, locuri de joaca pentru copii 124",
+"Complexe sportive, patinoare, hipodrom 125",
+"Sali antrenament 126",
+"Tribuna stadion 127",
+"Cabina telefon 128",
+"Cimitir 129",
+"Teren viran 130",
+"Diverse neindicate (canton, ghena, poligon trageri, culoar frontiera) 132",
+"Nedeterminate 133",
+"Vegetatii uscate 134",
+"Statie de autobuz/tramvai 135",
+"Spatiu comercial 136",
+"Mall 137",
+"Market/supermarket/hipermarket 138",
+"Statie metrou 139",
+"Fantana 140",
+"Ape curgatoare 141",
+"Ape statoare 142",
+"Drum judetean 143",
+"Drum national/european 144",
+"Autostrada 145",
+"Strada/alee pietonale din interiorul localitatilor 146"
+
+];
+
+       const terms4 = [
+"Instalatii electrice defecte",
+"Folosire generator, motor electric, cu defectiuni sau suprasolicitat 1",
+"Transformator, redresor, condensator defect sau suprasolicitat 2",
+"Contor sau aparat de masura, comanda si control defect 3",
+"Tablou de distrib., manon, doza, cu defectiuni, neizolat cores. sau suprasolicitat 4",
+"Aparat de conectare, pornire, oprire, reglaj, comutare sau priza defecta 5",
+"Sigurante fuzibile sau alte echipamente defecte ori supradimensionate 6",
+"Conductor, cablu electric defect, neizolat corespunzator sau cu izolatia deteriorata in urma unei actiuni mecanice ori fizice 7",
+"Aparate electr. de incalzire defecte, amplasate ori neizolate corespunzator 8",
+"Aparate electrocasnice defecte amplasate ori neizolate corespunzator 9",
+"Echipamente de iluminat electric defecte, neizolate, amplasate necorespunzator 10",
+"Neindepartarea materialelor si subst. combust. de pe instalatii, utilaje si ap. el. 11",
+"Acumulator electric defect 12",
+"Masini, utilaje sau alte aparate ori consumatori electrici cu defectiuni 13",
+"Echipamente electrice improvizate",
+"Masini si utilaje electrice cu improvizatii 14",
+"Aparate elec. de incalzire cu improvizatii sau folosite in alte scopuri 15",
+"Echipamente de iluminat electric improvizate 16",
+"Conductori electrici improvizati 17",
+"Contacte electrice improvizate 18",
+"Aparate de masura si control cu improvizatii 19",
+"Sigurante fuzibile improvizate 20",
+"Aparate electrice diverse cu improvizatii sau folosite in alte scopuri 21",
+"Aparate electrice sub tensiune nesupravegheate",
+"Aparate electrice de incalzire lasate sub tensiune 22",
+"Aparate electrocasnice lasate sub tensiune 23",
+"Mijloace de iluminat electric lasate sub tensiune 24",
+"Masini, utilaje si aparate tehnologice lasate sub tensiune 25",
+"Aparate de masura si control lasate sub tensiune 26",
+"Acumulator electric lasat sub sarcina 27",
+"Alte aparate electrice lasate sub tensiune si nesupravegheate 28",
+"Sisteme de incalzire defecte",
+"Sist. de incalzire (sau gatit) defecte, neizolate termic corespunzator 29",
+"Sist. de incalzire (sau gatit) amplasate necorespunzator fata de materiale comb. 30",
+"Agent termic (abur, etc.) supraincalzit 31",
+"Alimentarea defectuoasa cu combustibil a sistemelor de incalzire 32",
+"Sistem de incalzire necorespunzator pericolului de incendiu existent 33",
+"Mijloace de incalzire improvizate",
+"Mijloc de incalzire locala improvizat 34",
+"Corp de incalzire centrala improvizat 35",
+"Mijloc de incalzire tehnologica improvizat 36",
+"Aparat de gatit improvizat 37",
+"Mod gresit de aprindere 38",
+"Folosirea de combustibil neadecvat 39",
+"Amplasarea necorespunzatoare a mat. comb. fata de mijl. de incalzit 40",
+"Mijloace de incalzire nesupravegheate",
+"Mijloc de incalzire locala nesupravegheat ori supraincalzit 41",
+"Mijloc de incalzire tehnologica nesupravegheat ori supraincalzit 42",
+"Aparat de gatit nesupravegheat ori supraincalzit 43",
+"Modificarea pozitiei normale a mijl. de incalzire (cadere, rasturnare) 44",
+"Cos, burlan de fum defect sau necuratat",
+"Cos, canal sau burlan de fum deteriorat 45",
+"Cos, canal, burlan de fum amplasat ori neprotejat termic fata de mat. comb. 46",
+"Cos, canal, burlan de fum fara sita parascantei 47",
+"Cos, canal, burlan de fum necuratat de funingine 48",
+"Cenusa, jar si scantei de la sistemele de incalzit",
+"Depozitarea cenusei si jarului nestins in apropierea mat. combustibile 49",
+"Jar ori scantei purtate de vant si cazute pe mat. si substante combustibile 50",
+"Jar cazut din sistemele de incalzit 51",
+"Jocul copiilor cu focul",
+"Jocul copiilor cu focul (<6 ani) 52",
+"Jocul copiilor cu focul (>6 ani) 53",
+"Fumatul",
+"Fumatul in locuri nepermise sau in locuri neprotejate corespunzator 54",
+"Fumatul in timpul somnului 55",
+"Focul deschis",
+"Focul deschis in spatii deschise (vegetatii uscate, deseuri, miriste, foc de tabara, etc) 56",
+"Foc deschis in spatii inchise (lumanari, faclii, chibrituri, brichete) 57",
+"Sudură",
+"Sudura fara permis de lucru cu foc 58",
+"Sudare cu permis de lucru cu foc dar fara respectarea normelor 59",
+"Taiere, lipire fara respectarea normelor 60",
+"Autoaprindere sau reactii chimice",
+"Autoaprindere (contact cu aerul, contact cu oxigenul) 61",
+"Autoaprindere (contact cu apa sau umiditate marita) 62",
+"Autoaprindere (reactia chimica dintre substante) 63",
+"Autoaprinderea substantelor aflate in amestec 64",
+"Autoaprindere (neaerisire sau neventilare) 65",
+"Scantei mecanice, electrostatice si frecare",
+"Scantei mecanice 66",
+"Scantei de la locomotive, vehicule (masini agricole) 67",
+"Scantei electrostatice 68",
+"Frecare, patinare, alunecare 69",
+"Scurgeri, scapari de produse inflamabile",
+"Topituri de metale sau alte substante 70",
+"Scurgeri de lichide combustibile 71",
+"Scapari de vapori inflamabili 72",
+"Scapari de gaze combustibile 73",
+"Degajari de pulberi combustibile 74",
+"Defectiuni tehnice de proiectare, constructii si montaj",
+"Defectiuni de proiectare 75",
+"Defectiuni de fabricare sau executie 76",
+"Amplasare (montaj) necorespunzatoare 77",
+"Neprevederea sistemelor, dispozitivelor sau aparatelor de protectie, masura, control 78",
+"Necorelarea nivelului (grad) de protectie prevazut cu pericolul existent 79",
+"Defectiuni tehnice de exploatare",
+"Nerespectarea parametrilor tehnologici 80",
+"Nefunctionarea (lipsa) sistemelor de protectie, siguranta, masura, control 81",
+"Manevra sau mod de operare gresit 82",
+"Defectare (deteriorare) pe timpul exploatarii 83",
+"Reglaj defectuos 84",
+"Neprotejarea termica corespunzatoare 85",
+"Nerespectarea instructiunilor de lucru sau regulamentului de fabricatie 86",
+"Neexecutarea verificarilor, intretinerilor, reviziilor periodice 87",
+"Nereguli organizatorice",
+"Nesupravegherea locului de munca 88",
+"Parasirea locului de munca 89",
+"Folosirea de scule, unelte, dispozitive, instrumente de lucru necorespunzatoare 90",
+"Introducerea sau utilizarea de materiale periculoase in loc interzis 91",
+"Accesul altor persoane decat al celor admise 92",
+"Explozie urmata de incendiu",
+"Depozitarea sau pastrarea necorespunzatoare a materialelor combustibile 93",
+"Efectuarea unor lucrari, operatiuni periculoase 94",
+"Manipulare, transport, utilizare, depozitare necorespunzatoare a explozivilor 95",
+"Formarea de amestecuri explozive 96",
+"Pierderea calitatilor fizico-chimice ale unor instalatii, armaturi, conducte 97",
+"Accident urmat de incendiu",
+"Avarie tehnologica urmata de incendiu 98",
+"Iesirea de sub control a procesului tehnologic 99",
+"Catastrofa urmata de incendiu/incendiu urmat de explozie 100",
+"Caderea unui obiect (aeronava, proiectile, cablu electric aerian etc.) 101",
+"Soc (coliziune, ciocnire, lovire) 102",
+"Trasnet si alte fenomene naturale",
+"Trasnet 103",
+"Cutremur 104",
+"Furtuna puternica 105",
+"Temperatura atmosferica excesiva 106",
+"Alte cazuri 107",
+"Actiune intentionata",
+"Acoperirea (camuflarea) unei infractiuni grave 108",
+"Folosirea intentionata a sursei de aprindere pentru a genera incendiul 109",
+"Crearea intentionata sau din culpa a conditiilor de a genera incendiul 110",
+"Actiunea unor persoane iresponsabile (inclusiv autoincendierea) 111",
+"Alte imprejurari",
+"Caldura (radiatie) solara acumulata, concentrata ori reflectata 112",
+"Propagarea focului de la vecinatati 113",
+"Punerea in libertate a energiei nucleare 114",
+"Actiunea unor animale (pisici, pasari, sobolani, etc) 115",
+"In curs de stabilire 116",
+"Nedeterminate 117",
+ ]
+
+        function displayTerms(terms, listElement, highlightNumbers = false) {
+    listElement.innerHTML = '';
+    terms.forEach(term => {
+        const li = document.createElement('li');
+        const termWithoutNumber = term.replace(/\d+$/, '').trim();
+        const numberMatch = term.match(/\d+$/);
+
+        // Dacă termenul are număr, adăugăm caseta de checkbox
+        if (numberMatch) {
+            const checkbox = document.createElement('input');
+            checkbox.type = 'checkbox';
+            checkbox.value = term;
+            li.appendChild(checkbox);
+        }
+
+        const termText = document.createTextNode(' ' + termWithoutNumber);
+        li.appendChild(termText);
+
+        // Dacă termenul are număr, adăugăm box-ul cu numărul
+        if (highlightNumbers && numberMatch) {
+            const numberBox = document.createElement('span');
+            numberBox.className = 'number-box';
+            numberBox.textContent = numberMatch[0];
+            li.appendChild(numberBox);
+        }
+
+        // Dacă termenul nu are număr, schimbăm fundalul pe gri
+        if (!numberMatch) {
+            li.style.backgroundColor = '#d3d3d3';  // Gri
+            li.style.fontWeight = 'bold'; //bold
+        }
+
+        listElement.appendChild(li);
+    });
+}
+
+
+        function setupSearch(searchInputId, termsListId, terms, highlightNumbers = false) {
+            const searchInput = document.getElementById(searchInputId);
+            const termsList = document.getElementById(termsListId);
+
+            displayTerms(terms, termsList, highlightNumbers);
+
+            searchInput.addEventListener('input', function () {
+                const query = this.value.toLowerCase();
+                const filteredTerms = terms.filter(term => term.toLowerCase().includes(query));
+                displayTerms(filteredTerms, termsList, highlightNumbers);
+            });
+        }
+        setupSearch('searchInput0', 'termsList0', terms0, true);
+        setupSearch('searchInput1', 'termsList1', terms1, true);
+        setupSearch('searchInput2', 'termsList2', terms2, true);
+        setupSearch('searchInput3', 'termsList3', terms3, true);
+        setupSearch('searchInput4', 'termsList4', terms4, true);
+
+        function setupToggle(sectionId, contentId) {
+            const sectionHeader = document.getElementById(sectionId);
+            const content = document.getElementById(contentId);
+            const arrow = sectionHeader.querySelector('.arrow');
+
+            sectionHeader.addEventListener('click', function () {
+                content.classList.toggle('hidden');
+                arrow.classList.toggle('rotate');
+            });
+        }
+
+        setupToggle('togglelocul', 'loculContent');
+        setupToggle('toggleSursa', 'sursaContent');
+        setupToggle('toggleMijlocul', 'mijloculContent');
+        setupToggle('toggleMaterial', 'materialContent');
+        setupToggle('toggleImprejurare', 'imprejurareContent');
+
+        document.getElementById('generateSource').addEventListener('click', function () {
+            const selectedTerms = Array.from(document.querySelectorAll('ul input[type="checkbox"]:checked'))
+                                        .map(checkbox => ({
+                                            section: checkbox.closest('div').previousElementSibling.textContent.trim(),
+                                            term: checkbox.value
+                                        }));
+
+            const selectedTermsDiv = document.getElementById('selectedTerms');
+            if (selectedTerms.length) {
+                selectedTermsDiv.innerHTML = '<strong>Elemente selectate:</strong><br>' + 
+                selectedTerms.map(item => {
+    const number = item.term.match(/\d+/);
+    return `<div class="selected-item"> 
+                <span class="section-title">${item.section}:</span> <br> 
+                ${item.term.replace(number ? number[0] : '', '').trim()}
+                ${number ? `<span class="number-box">${number[0]}</span>` : ''}
+            </div>`;
+}).join('');
+         } else {
+                selectedTermsDiv.innerHTML = 'Nu ai selectat niciun element.';
+            }
+        });
+    </script>
+<script>
+    function setupSingleSelection(termsListId) {
+        const termsList = document.getElementById(termsListId);
+        
+        termsList.addEventListener('change', function(event) {
+            if (event.target.type === 'checkbox') {
+                Array.from(termsList.querySelectorAll('input[type="checkbox"]')).forEach(checkbox => {
+                    if (checkbox !== event.target) {
+                        checkbox.checked = false;
+                    }
+                });
+            }
+        });
+    }
+
+    setupSingleSelection('termsList1');
+    setupSingleSelection('termsList2');
+    setupSingleSelection('termsList3');
+    setupSingleSelection('termsList4');
+    setupSingleSelection('termsList0');
+    
+   
+    
+</script>
+
+</body>
+</html>
