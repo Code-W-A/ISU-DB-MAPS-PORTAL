@@ -28,6 +28,7 @@ interface UserRoleTableProps {
 }
 
 const ALL_TABS = [
+  { value: "catd", label: "CATD" },
   { value: "users", label: "Utilizatori" },
   { value: "hydrants", label: "Hidranți" },
   { value: "reports", label: "Semnalări" },

@@ -7,11 +7,14 @@ export const MAP_TOOL_LINK_TAB_ADR = "adr"
 export const MAP_TOOL_LINK_TAB_LEGISLATIE = "legislatie"
 export const MAP_TOOL_LINK_TAB_ISU_NOTES = "isuNotes"
 
+export const MAP_TOOL_LINK_TAB_CATD = "catd"
+
 export type MapToolLinkFlags = {
   showIndrumatorLink: boolean
   showProcesVerbalLink: boolean
   showAdrLink: boolean
   showLegislatieLink: boolean
+  showCatdLink: boolean
   showIsuNotesLink: boolean
 }
 
@@ -52,6 +55,7 @@ export function getMapToolLinkFlags(params: {
       showProcesVerbalLink: true,
       showAdrLink: true,
       showLegislatieLink: true,
+      showCatdLink: true,
       showIsuNotesLink: true,
     }
   }
@@ -63,6 +67,7 @@ export function getMapToolLinkFlags(params: {
     showProcesVerbalLink: tabs.includes(MAP_TOOL_LINK_TAB_PROCES_VERBAL),
     showAdrLink: tabs.includes(MAP_TOOL_LINK_TAB_ADR),
     showLegislatieLink: tabs.includes(MAP_TOOL_LINK_TAB_LEGISLATIE),
+    showCatdLink: tabs.includes(MAP_TOOL_LINK_TAB_CATD),
     showIsuNotesLink: tabs.includes(MAP_TOOL_LINK_TAB_ISU_NOTES),
   }
 }

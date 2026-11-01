@@ -23,6 +23,7 @@ interface GoogleMapsLoaderProps {
   showProcesVerbalLink?: boolean
   showAdrLink?: boolean
   showLegislatieLink?: boolean
+  showCatdLink?: boolean
   showIsuNotesLink?: boolean
 }
 
@@ -37,6 +38,7 @@ export function GoogleMapsLoader({
   showProcesVerbalLink = false,
   showAdrLink = false,
   showLegislatieLink = false,
+  showCatdLink = false,
   showIsuNotesLink = false,
 }: GoogleMapsLoaderProps) {
   const [desktopNavOpen, setDesktopNavOpen] = useState(false)
@@ -238,6 +240,7 @@ export function GoogleMapsLoader({
             showProcesVerbalLink={showProcesVerbalLink}
             showAdrLink={showAdrLink}
             showLegislatieLink={showLegislatieLink}
+            showCatdLink={showCatdLink}
             showIsuNotesLink={showIsuNotesLink}
           />
           <div className="relative min-h-0 flex-1">{renderChildren()}</div>
@@ -270,6 +273,7 @@ export function GoogleMapsLoader({
                   showProcesVerbalLink={showProcesVerbalLink}
                   showAdrLink={showAdrLink}
                   showLegislatieLink={showLegislatieLink}
+                  showCatdLink={showCatdLink}
                   showIsuNotesLink={showIsuNotesLink}
                   showPreventionFullMapLink={showPreventionFullMapLink}
                   navContext={{ type: "map", mapVariant: isPrevention ? "prevention" : "default" }}

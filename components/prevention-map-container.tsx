@@ -36,6 +36,7 @@ function PreventionMapGml({
         showProcesVerbalLink={nav.mapToolLinks.showProcesVerbalLink}
         showAdrLink={nav.mapToolLinks.showAdrLink}
         showLegislatieLink={nav.mapToolLinks.showLegislatieLink}
+        showCatdLink={nav.mapToolLinks.showCatdLink}
         showIsuNotesLink={nav.mapToolLinks.showIsuNotesLink}
       >
         <PreventionFullPageMap access={access} allUsers={allUsers} />

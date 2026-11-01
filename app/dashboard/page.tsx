@@ -16,6 +16,7 @@ import {
   MdWarning,
 } from "react-icons/md"
 import { useAuth } from "@/components/auth-provider"
+import { CatdSyncControl } from "@/components/dashboard/catd-sync-control"
 import { DataImport } from "@/components/dashboard/data-import"
 import { DataSourceToggle } from "@/components/dashboard/data-source-toggle"
 import { HydrantReportsTable } from "@/components/dashboard/hydrant-reports-table"
@@ -296,6 +297,7 @@ export default function DashboardPage() {
 
         {dashboardTabs.includes("settings") && (
           <TabsContent value="settings" className="space-y-6">
+            {user?.email === "radu.p1995@yahoo.com" && <CatdSyncControl />}
             <LegislatieSyncControl />
             <DataSourceToggle />
           </TabsContent>

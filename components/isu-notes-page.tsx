@@ -82,6 +82,7 @@ export function IsuNotesPage() {
             showProcesVerbalLink={nav.mapToolLinks.showProcesVerbalLink}
             showAdrLink={nav.mapToolLinks.showAdrLink}
             showLegislatieLink={nav.mapToolLinks.showLegislatieLink}
+            showCatdLink={nav.mapToolLinks.showCatdLink}
             showIsuNotesLink={nav.mapToolLinks.showIsuNotesLink}
             showPreventionFullMapLink={nav.hasPreventionZonesAccess}
             navContext={{ type: "tool", tool: "isuNotes" }}

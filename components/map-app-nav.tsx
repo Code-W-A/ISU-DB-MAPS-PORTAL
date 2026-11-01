@@ -63,7 +63,7 @@ function NavItemAnchor({
 
 export type MapAppNavContext =
   | { type: "map"; mapVariant: "default" | "prevention" }
-  | { type: "tool"; tool: "indrumator" | "proces-verbal-interventie" | "adr" | "legislatie" | "isuNotes" }
+  | { type: "tool"; tool: "catd" | "indrumator" | "proces-verbal-interventie" | "adr" | "legislatie" | "isuNotes" }
 
 export interface MapAppNavListBaseProps {
   isAdmin: boolean
@@ -73,6 +73,7 @@ export interface MapAppNavListBaseProps {
   showProcesVerbalLink: boolean
   showAdrLink: boolean
   showLegislatieLink: boolean
+  showCatdLink?: boolean
   showIsuNotesLink: boolean
   showPreventionFullMapLink: boolean
   onClose: () => void
@@ -112,6 +113,12 @@ function MapAppNavListMapMode({
         <NavItemLink href="/legislatie" onClose={onClose}>
           <MdAccountBalance size={22} className="shrink-0" />
           <span>Legislatie</span>
+        </NavItemLink>
+      )}
+      {props.showCatdLink && (
+        <NavItemLink href="/catd" onClose={onClose}>
+          <MdMap size={22} className="shrink-0" />
+          <span>CATD</span>
         </NavItemLink>
       )}
       {props.showIsuNotesLink && (
@@ -208,6 +215,12 @@ function MapAppNavListToolMode({ onClose, ...props }: NavListFields) {
         <NavItemLink href="/legislatie" onClose={onClose}>
           <MdAccountBalance size={22} className="shrink-0" />
           <span>Legislatie</span>
+        </NavItemLink>
+      )}
+      {props.showCatdLink && (
+        <NavItemLink href="/catd" onClose={onClose}>
+          <MdMap size={22} className="shrink-0" />
+          <span>CATD</span>
         </NavItemLink>
       )}
       {props.showIsuNotesLink && (

@@ -10,6 +10,7 @@ const emptyFlags: MapToolLinkFlags = {
   showProcesVerbalLink: false,
   showAdrLink: false,
   showLegislatieLink: false,
+  showCatdLink: false,
   showIsuNotesLink: false,
 }
 
@@ -69,7 +70,8 @@ export async function loadMapToolLinkFlags(
   try {
     const list = await getAllUsers()
     const current = list.find((u) => u.email === user.email || u.uid === user.uid)
-    return getMapToolLinkFlags({ email: user.email, allowedTabs: current?.allowedTabs })
+    const flags = getMapToolLinkFlags({ email: user.email, allowedTabs: current?.allowedTabs })
+    return { ...flags, showCatdLink: full && flags.showCatdLink }
   } catch {
     return emptyFlags
   }

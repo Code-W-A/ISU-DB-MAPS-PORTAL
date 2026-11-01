@@ -58,6 +58,7 @@ describe("map tool permissions", () => {
       showProcesVerbalLink: true,
       showAdrLink: true,
       showLegislatieLink: true,
+      showCatdLink: true,
       showIsuNotesLink: true,
     })
   })
@@ -72,4 +73,10 @@ describe("map tool permissions", () => {
         .showIsuNotesLink,
     ).toBe(false)
   })
+})
+
+ test("CATD is independent and denied by default", () => {
+  expect(getMapToolLinkFlags({ email: "reader@test.ro", allowedTabs: ["catd"] }).showCatdLink).toBe(true)
+  expect(getMapToolLinkFlags({ email: "reader@test.ro", allowedTabs: ["hydrants"] }).showCatdLink).toBe(false)
+  expect(getMapToolLinkFlags({ email: "reader@test.ro", allowedTabs: undefined }).showCatdLink).toBe(false)
 })

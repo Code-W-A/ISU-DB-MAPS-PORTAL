@@ -17,6 +17,7 @@ interface MobileHeaderProps {
   showProcesVerbalLink?: boolean
   showAdrLink?: boolean
   showLegislatieLink?: boolean
+  showCatdLink?: boolean
   showIsuNotesLink?: boolean
 }
 
@@ -30,6 +31,7 @@ export function MobileHeader({
   showProcesVerbalLink = false,
   showAdrLink = false,
   showLegislatieLink = false,
+  showCatdLink = false,
   showIsuNotesLink = false,
 }: MobileHeaderProps) {
   const [menuOpen, setMenuOpen] = useState(false)
@@ -61,6 +63,7 @@ export function MobileHeader({
           showProcesVerbalLink={showProcesVerbalLink}
           showAdrLink={showAdrLink}
           showLegislatieLink={showLegislatieLink}
+          showCatdLink={showCatdLink}
           showIsuNotesLink={showIsuNotesLink}
           showPreventionFullMapLink={showPreventionFullMapLink}
           navContext={{ type: "map", mapVariant: isPrevention ? "prevention" : "default" }}

@@ -11,7 +11,7 @@ import { Button } from "@/components/ui/button"
 import { useMapAppNavPermissions } from "@/hooks/use-map-app-nav-permissions"
 import { cn } from "@/lib/utils"
 
-export type ToolShellKind = "indrumator" | "proces-verbal-interventie" | "adr" | "legislatie"
+export type ToolShellKind = "catd" | "indrumator" | "proces-verbal-interventie" | "adr" | "legislatie"
 
 type ToolPageShellProps = {
   title: string
@@ -26,6 +26,7 @@ function mapToolToContext(tool: ToolShellKind): MapAppNavContext {
 }
 
 function hasAccessToTool(tool: ToolShellKind, flags: ReturnType<typeof useMapAppNavPermissions>["mapToolLinks"]) {
+  if (tool === "catd") return flags.showCatdLink
   if (tool === "indrumator") return flags.showIndrumatorLink
   if (tool === "proces-verbal-interventie") return flags.showProcesVerbalLink
   if (tool === "adr") return flags.showAdrLink
@@ -105,6 +106,7 @@ export function ToolPageShell({
             showProcesVerbalLink={nav.mapToolLinks.showProcesVerbalLink}
             showAdrLink={nav.mapToolLinks.showAdrLink}
             showLegislatieLink={nav.mapToolLinks.showLegislatieLink}
+            showCatdLink={nav.mapToolLinks.showCatdLink}
             showIsuNotesLink={nav.mapToolLinks.showIsuNotesLink}
             showPreventionFullMapLink={nav.hasPreventionZonesAccess}
             navContext={navContext}
