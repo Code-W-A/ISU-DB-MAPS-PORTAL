@@ -1,6 +1,6 @@
 # Firestore: ISU Notes
 
-Caiet de text (fără Storage). Accesul la colecții se ia **doar** din Dashboard → Utilizatori, câmpul `allowedTabs`, exact ca la Hidranți. În ISU Notes nu există drepturi pe conturi.
+Caiet de text (fără Storage). Accesul la zona se ia din Dashboard → Utilizatori, câmpul `allowedTabs`. Separat, proprietarul unei note private poate acorda conturilor care au deja acces la ISU Notes drept Read sau Write.
 
 ## Acces
 
@@ -41,13 +41,17 @@ Folderele sunt ale autorului. La ștergere, notele din folder trec la `folderId:
 | `createdAt` | number (ms) |
 | `updatedAt` | number (ms) |
 
-- **private**: doar autorul citește și editează
+- **private**: doar autorul citește și editează implicit; colaboratorii explicit partajați au dreptul configurat
 - **common**: toți cei cu tab-ul ISU Notes citesc; editarea / ștergerea / mutarea / Privat↔Comun rămân la autor
+- Notele private pot fi partajate explicit. Read permite citirea; Write permite editarea titlului și paginilor. Ștergerea, mutarea și administrarea accesului rămân la autor.
+- Partajarea folosește `sharedWithUids` (toți colaboratorii), `sharedWriteUids` (subsetul cu Write) și `sharedWithEmails` (etichete UI). Documentele vechi fără aceste câmpuri rămân valide.
+- Schimbarea notei în „Comun” elimină partajarea explicită; notele comune rămân read-only pentru ceilalți utilizatori.
 
-Clientul încarcă notele cu două interogări (obligatoriu pentru ca regulile să permită lista):
+Clientul încarcă notele cu trei interogări (obligatoriu pentru ca regulile să permită lista):
 
 1. `where("ownerUid", "==", uid)`
 2. `where("visibility", "==", "common")`
+3. `where("sharedWithUids", "array-contains", uid)`
 
 Apoi unește și deduplică pe client. Sortarea se face pe client (dată / nume).
 
@@ -101,17 +105,31 @@ service cloud.firestore {
     match /isuNotes/{noteId} {
       allow read: if hasIsuNotesAccess() && (
         resource.data.ownerUid == request.auth.uid ||
-        resource.data.visibility == 'common'
+        resource.data.visibility == 'common' ||
+        ('sharedWithUids' in resource.data && request.auth.uid in resource.data.sharedWithUids)
       );
       allow create: if hasIsuNotesAccess()
         && request.resource.data.ownerUid == request.auth.uid
-        && request.resource.data.visibility == 'private';
-      allow update, delete: if hasIsuNotesAccess()
-        && resource.data.ownerUid == request.auth.uid
-        && request.resource.data.ownerUid == resource.data.ownerUid;
+        && request.resource.data.visibility == 'private'
+        && (!('sharedWithUids' in request.resource.data) || request.resource.data.sharedWithUids.size() == 0)
+        && (!('sharedWriteUids' in request.resource.data) || request.resource.data.sharedWriteUids.size() == 0);
+      allow update: if hasIsuNotesAccess()
+        && request.resource.data.ownerUid == resource.data.ownerUid
+        && (
+          resource.data.ownerUid == request.auth.uid ||
+          (
+            resource.data.visibility == 'private' &&
+            'sharedWriteUids' in resource.data &&
+            'sharedWithUids' in resource.data &&
+            request.auth.uid in resource.data.sharedWithUids &&
+            request.auth.uid in resource.data.sharedWriteUids &&
+            request.resource.data.diff(resource.data).affectedKeys().hasOnly(['title', 'pages', 'updatedAt'])
+          )
+        );
+      allow delete: if hasIsuNotesAccess() && resource.data.ownerUid == request.auth.uid;
     }
   }
 }
 ```
 
-După publicarea regulilor, bifați **ISU Notes** pe un cont din Dashboard → Utilizatori și creați o notă de test (se naște **Privată**).
+**Aplicare obligatorie înainte de producție:** acest checkout nu conține fișierul de reguli Firestore și nici `firebase.json`; blocul de mai sus este fragmentul de integrare, nu a fost publicat. Integrați-l în regulile active fără a înlocui restul acestora și apoi testați pe emulator/mediu dedicat. Bifați **ISU Notes** destinatarilor din Dashboard → Utilizatori. O notă nouă se naște **Privată**.

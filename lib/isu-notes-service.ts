@@ -60,6 +60,20 @@ function docToNote(id: string, data: Record<string, unknown>): IsuNote | null {
     pages: asPages(data.pages),
     visibility,
     folderId: typeof data.folderId === "string" && data.folderId ? data.folderId : null,
+    sharedWithUids: Array.isArray(data.sharedWithUids)
+      ? data.sharedWithUids.filter((uid): uid is string => typeof uid === "string")
+      : [],
+    sharedWriteUids: Array.isArray(data.sharedWriteUids)
+      ? data.sharedWriteUids.filter((uid): uid is string => typeof uid === "string")
+      : [],
+    sharedWithEmails:
+      data.sharedWithEmails && typeof data.sharedWithEmails === "object" && !Array.isArray(data.sharedWithEmails)
+        ? Object.fromEntries(
+            Object.entries(data.sharedWithEmails as Record<string, unknown>).filter(
+              (entry): entry is [string, string] => typeof entry[1] === "string",
+            ),
+          )
+        : {},
     ownerUid,
     ownerEmail: typeof data.ownerEmail === "string" ? data.ownerEmail : "",
     createdAt: typeof data.createdAt === "number" ? data.createdAt : 0,
@@ -67,10 +81,11 @@ function docToNote(id: string, data: Record<string, unknown>): IsuNote | null {
   }
 }
 
-function mergeNotes(mine: IsuNote[], common: IsuNote[]): IsuNote[] {
+function mergeNotes(mine: IsuNote[], common: IsuNote[], shared: IsuNote[]): IsuNote[] {
   const map = new Map<string, IsuNote>()
   for (const note of mine) map.set(note.id, note)
   for (const note of common) map.set(note.id, note)
+  for (const note of shared) map.set(note.id, note)
   return Array.from(map.values())
 }
 
@@ -106,8 +121,9 @@ export function subscribeIsuNotes(
 
   let mine: IsuNote[] = []
   let common: IsuNote[] = []
+  let shared: IsuNote[] = []
 
-  const emit = () => onNotes(mergeNotes(mine, common))
+  const emit = () => onNotes(mergeNotes(mine, common, shared))
 
   const unsubMine = onSnapshot(
     mineQuery,
@@ -135,9 +151,24 @@ export function subscribeIsuNotes(
     (err) => onError?.(err instanceof Error ? err : new Error(String(err))),
   )
 
+  const sharedQuery = query(col, where("sharedWithUids", "array-contains", ownerUid))
+  const unsubShared = onSnapshot(
+    sharedQuery,
+    (snap) => {
+      shared = []
+      snap.forEach((item) => {
+        const note = docToNote(item.id, item.data() as Record<string, unknown>)
+        if (note) shared.push(note)
+      })
+      emit()
+    },
+    (err) => onError?.(err instanceof Error ? err : new Error(String(err))),
+  )
+
   return () => {
     unsubMine()
     unsubCommon()
+    unsubShared()
   }
 }
 
@@ -185,6 +216,9 @@ export async function createIsuNote(input: {
     pages: [createEmptyPage()],
     visibility: "private" as const,
     folderId: input.folderId ?? null,
+    sharedWithUids: [] as string[],
+    sharedWriteUids: [] as string[],
+    sharedWithEmails: {} as Record<string, string>,
     ownerUid: input.ownerUid,
     ownerEmail: input.ownerEmail,
     createdAt: now,
@@ -195,7 +229,7 @@ export async function createIsuNote(input: {
 }
 
 export type IsuNotePatch = Partial<
-  Pick<IsuNote, "title" | "pages" | "visibility" | "folderId">
+  Pick<IsuNote, "title" | "pages" | "visibility" | "folderId" | "sharedWithUids" | "sharedWriteUids" | "sharedWithEmails">
 >
 
 export async function updateIsuNote(noteId: string, patch: IsuNotePatch): Promise<void> {

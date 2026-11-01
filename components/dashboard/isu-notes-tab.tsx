@@ -4,6 +4,7 @@ import { useCallback, useEffect, useMemo, useRef, useState, type ReactNode } fro
 import { useAuth } from "@/components/auth-provider"
 import { Button } from "@/components/ui/button"
 import { Card, CardContent } from "@/components/ui/card"
+import { Checkbox } from "@/components/ui/checkbox"
 import {
   Dialog,
   DialogContent,
@@ -27,6 +28,9 @@ import { IsuNoteEditor } from "@/components/dashboard/isu-note-editor"
 import { toast } from "@/components/ui/use-toast"
 import { downloadIsuNotePdf } from "@/lib/isu-notes-pdf"
 import { plainTextFromHtml } from "@/lib/isu-notes-html"
+import { getAllUsers } from "@/lib/role-service"
+import { MAIN_ADMIN_EMAIL } from "@/lib/map-tool-links"
+import { buildIsuNoteSharingFields, getIsuNoteAccess, getIsuNoteShares } from "@/lib/isu-notes-sharing"
 import {
   createEmptyPage,
   createIsuFolder,
@@ -38,7 +42,8 @@ import {
   subscribeIsuNotes,
   updateIsuNote,
 } from "@/lib/isu-notes-service"
-import type { IsuNote, IsuNoteFolder, IsuNotePage, IsuNoteVisibility } from "@/types/isu-notes"
+import type { IsuNote, IsuNoteFolder, IsuNotePage, IsuNoteShareAccess, IsuNoteVisibility } from "@/types/isu-notes"
+import type { UserRole } from "@/types/user-role"
 import {
   MdAdd,
   MdArrowBack,
@@ -131,6 +136,12 @@ export function IsuNotesTab({ onEditingChange }: { onEditingChange?: (editing: b
   const [infoOpen, setInfoOpen] = useState(false)
   const [moveNoteId, setMoveNoteId] = useState<string | null>(null)
   const [exporting, setExporting] = useState(false)
+  const [shareDialogOpen, setShareDialogOpen] = useState(false)
+  const [shareUsers, setShareUsers] = useState<UserRole[]>([])
+  const [shareUsersLoading, setShareUsersLoading] = useState(false)
+  const [shareFilter, setShareFilter] = useState("")
+  const [shareDraft, setShareDraft] = useState<Record<string, IsuNoteShareAccess>>({})
+  const [shareSaving, setShareSaving] = useState(false)
   const saveTimer = useRef<ReturnType<typeof setTimeout> | null>(null)
   const draftRef = useRef<IsuNote | null>(null)
 
@@ -215,15 +226,22 @@ export function IsuNotesTab({ onEditingChange }: { onEditingChange?: (editing: b
   }, [selectedNoteId, selectedFromList])
 
   const flushSave = useCallback(async (note: IsuNote) => {
-    if (note.ownerUid !== uid) return
+    const access = getIsuNoteAccess(note, uid)
+    if (access !== "owner" && access !== "write") return
     setSaveState("saving")
     try {
-      await updateIsuNote(note.id, {
-        title: note.title,
-        pages: note.pages,
-        visibility: note.visibility,
-        folderId: note.folderId,
-      })
+      const patch = access === "owner"
+        ? {
+            title: note.title,
+            pages: note.pages,
+            visibility: note.visibility,
+            folderId: note.folderId,
+            sharedWithUids: note.sharedWithUids,
+            sharedWriteUids: note.sharedWriteUids,
+            sharedWithEmails: note.sharedWithEmails,
+          }
+        : { title: note.title, pages: note.pages }
+      await updateIsuNote(note.id, patch)
       setSaveState("saved")
     } catch (error) {
       console.error(error)
@@ -234,7 +252,8 @@ export function IsuNotesTab({ onEditingChange }: { onEditingChange?: (editing: b
 
   const scheduleSave = useCallback(
     (next: IsuNote) => {
-      if (next.ownerUid !== uid) return
+      const access = getIsuNoteAccess(next, uid)
+      if (access !== "owner" && access !== "write") return
       if (saveTimer.current) clearTimeout(saveTimer.current)
       saveTimer.current = setTimeout(() => {
         void flushSave(next)
@@ -251,7 +270,9 @@ export function IsuNotesTab({ onEditingChange }: { onEditingChange?: (editing: b
 
   const updateDraft = (patch: Partial<IsuNote>) => {
     setDraft((prev) => {
-      if (!prev || prev.ownerUid !== uid) return prev
+      if (!prev) return prev
+      const access = getIsuNoteAccess(prev, uid)
+      if (access !== "owner" && access !== "write") return prev
       const next = { ...prev, ...patch, updatedAt: Date.now() }
       scheduleSave(next)
       return next
@@ -259,6 +280,8 @@ export function IsuNotesTab({ onEditingChange }: { onEditingChange?: (editing: b
   }
 
   const isOwner = Boolean(draft && draft.ownerUid === uid)
+  const draftAccess = draft ? getIsuNoteAccess(draft, uid) : "none"
+  const canEdit = draftAccess === "owner" || draftAccess === "write"
   const currentPage: IsuNotePage | undefined = draft?.pages[pageIndex]
 
   const visibleNotes = useMemo(() => {
@@ -266,8 +289,9 @@ export function IsuNotesTab({ onEditingChange }: { onEditingChange?: (editing: b
     const filtered = notes.filter((note) => {
       if (visibilityFilter === "private" && note.visibility !== "private") return false
       if (visibilityFilter === "common" && note.visibility !== "common") return false
-      if (selectedFolder === FOLDER_NONE && note.folderId) return false
-      if (selectedFolder !== FOLDER_ALL && selectedFolder !== FOLDER_NONE && note.folderId !== selectedFolder) {
+      const visibleFolderId = note.ownerUid === uid ? note.folderId : null
+      if (selectedFolder === FOLDER_NONE && visibleFolderId) return false
+      if (selectedFolder !== FOLDER_ALL && selectedFolder !== FOLDER_NONE && visibleFolderId !== selectedFolder) {
         return false
       }
       if (query && !searchHaystack(note).includes(query)) return false
@@ -281,17 +305,17 @@ export function IsuNotesTab({ onEditingChange }: { onEditingChange?: (editing: b
       return b.updatedAt - a.updatedAt
     })
     return filtered
-  }, [notes, search, selectedFolder, sortMode, visibilityFilter])
+  }, [notes, search, selectedFolder, sortMode, uid, visibilityFilter])
 
   const folderCounts = useMemo(() => {
     const counts: Record<string, number> = { [FOLDER_ALL]: notes.length, [FOLDER_NONE]: 0 }
     for (const folder of folders) counts[folder.id] = 0
     for (const note of notes) {
-      if (!note.folderId) counts[FOLDER_NONE] += 1
+      if (note.ownerUid !== uid || !note.folderId) counts[FOLDER_NONE] += 1
       else if (counts[note.folderId] !== undefined) counts[note.folderId] += 1
     }
     return counts
-  }, [folders, notes])
+  }, [folders, notes, uid])
 
   const handleNewNote = async () => {
     if (!uid) return
@@ -308,12 +332,80 @@ export function IsuNotesTab({ onEditingChange }: { onEditingChange?: (editing: b
     }
   }
 
+  const openShareDialog = async () => {
+    if (!draft || !isOwner || draft.visibility !== "private") return
+    setShareDraft(getIsuNoteShares(draft))
+    setShareFilter("")
+    setShareDialogOpen(true)
+    if (shareUsers.length || shareUsersLoading) return
+    setShareUsersLoading(true)
+    try {
+      setShareUsers(await getAllUsers())
+    } catch (error) {
+      console.error(error)
+      toast({ title: "Eroare", description: "Nu s-au putut încărca utilizatorii.", variant: "destructive" })
+    } finally {
+      setShareUsersLoading(false)
+    }
+  }
+
+  const eligibleShareUsers = useMemo(() => {
+    const seen = new Set<string>()
+    return shareUsers.filter((candidate) => {
+      if (!candidate.uid || candidate.uid === uid || !candidate.email) return false
+      if (candidate.email !== MAIN_ADMIN_EMAIL && !candidate.allowedTabs?.includes("isuNotes")) return false
+      if (seen.has(candidate.uid)) return false
+      seen.add(candidate.uid)
+      return true
+    })
+  }, [shareUsers, uid])
+
+  const visibleShareUsers = useMemo(() => {
+    const known = new Set(eligibleShareUsers.map((candidate) => candidate.uid))
+    const unavailable = Object.keys(shareDraft)
+      .filter((shareUid) => !known.has(shareUid))
+      .map((shareUid) => ({ uid: shareUid, email: draft?.sharedWithEmails[shareUid] || shareUid }))
+    const candidates = [...eligibleShareUsers, ...unavailable]
+    const query = shareFilter.trim().toLowerCase()
+    return query ? candidates.filter((candidate) => candidate.email.toLowerCase().includes(query)) : candidates
+  }, [draft?.sharedWithEmails, eligibleShareUsers, shareDraft, shareFilter])
+
+  const handleSaveShares = async () => {
+    if (!draft || !isOwner || draft.visibility !== "private" || shareSaving) return
+    if (saveTimer.current) {
+      clearTimeout(saveTimer.current)
+      saveTimer.current = null
+    }
+    setShareSaving(true)
+    try {
+      const knownEmails = Object.fromEntries(eligibleShareUsers.map((candidate) => [candidate.uid, candidate.email]))
+      const emails = { ...draft.sharedWithEmails, ...knownEmails }
+      const fields = buildIsuNoteSharingFields(shareDraft, emails)
+      await updateIsuNote(draft.id, {
+        title: draft.title,
+        pages: draft.pages,
+        visibility: draft.visibility,
+        folderId: draft.folderId,
+        ...fields,
+      })
+      const updated = { ...draft, ...fields, updatedAt: Date.now() }
+      setDraft(updated)
+      setShareDialogOpen(false)
+      toast({ title: "Acces actualizat" })
+    } catch (error) {
+      console.error(error)
+      toast({ title: "Eroare", description: "Drepturile de acces nu au putut fi salvate.", variant: "destructive" })
+    } finally {
+      setShareSaving(false)
+    }
+  }
+
   const handleBackToList = async () => {
     if (saveTimer.current) {
       clearTimeout(saveTimer.current)
       saveTimer.current = null
     }
-    if (draft && isOwner) {
+    if (draft && canEdit) {
       const remote = notes.find((note) => note.id === draft.id)
       if (!remote || !notesEqualForSave(draft, remote)) {
         await flushSave(draft)
@@ -357,21 +449,21 @@ export function IsuNotesTab({ onEditingChange }: { onEditingChange?: (editing: b
   }
 
   const handleAddPage = () => {
-    if (!draft || !isOwner) return
+    if (!draft || !canEdit) return
     const pages = [...draft.pages, createEmptyPage()]
     updateDraft({ pages })
     setPageIndex(pages.length - 1)
   }
 
   const handleDeletePage = () => {
-    if (!draft || !isOwner || draft.pages.length <= 1) return
+    if (!draft || !canEdit || draft.pages.length <= 1) return
     const pages = draft.pages.filter((_, index) => index !== pageIndex)
     updateDraft({ pages })
     setPageIndex((index) => Math.max(0, Math.min(index, pages.length - 1)))
   }
 
   const handlePageContent = (content: string) => {
-    if (!draft || !isOwner) return
+    if (!draft || !canEdit) return
     const pages = draft.pages.map((page, index) => (index === pageIndex ? { ...page, content } : page))
     updateDraft({ pages })
   }
@@ -454,11 +546,11 @@ export function IsuNotesTab({ onEditingChange }: { onEditingChange?: (editing: b
         ? "Se salvează…"
         : saveState === "saved"
           ? "Salvat ✓"
-          : isOwner
+          : canEdit
             ? "Salvare automată"
             : "Doar citire"
     const mobileSaveLabel =
-      saveState === "saving" ? "Se salvează…" : saveState === "saved" ? "Salvat ✓" : isOwner ? "" : "Doar citire"
+      saveState === "saving" ? "Se salvează…" : saveState === "saved" ? "Salvat ✓" : canEdit ? "" : "Doar citire"
 
     return (
       <div className="flex min-h-full flex-col">
@@ -490,6 +582,11 @@ export function IsuNotesTab({ onEditingChange }: { onEditingChange?: (editing: b
                 <MdPictureAsPdf className="mr-2 h-4 w-4" />
                 {exporting ? "Se exportă…" : "Exportă PDF"}
               </DropdownMenuItem>
+              {isOwner && draft.visibility === "private" && (
+                <DropdownMenuItem onSelect={() => void openShareDialog()}>
+                  <MdPeople className="mr-2 h-4 w-4" /> Partajează
+                </DropdownMenuItem>
+              )}
               {isOwner && (
                 <>
                   <DropdownMenuSeparator />
@@ -516,6 +613,11 @@ export function IsuNotesTab({ onEditingChange }: { onEditingChange?: (editing: b
               <MdPictureAsPdf className="mr-1 h-4 w-4" />
               {exporting ? "Se exportă…" : "Export PDF"}
             </Button>
+            {isOwner && draft.visibility === "private" && (
+              <Button variant="outline" size="sm" onClick={() => void openShareDialog()}>
+                <MdPeople className="mr-1 h-4 w-4" /> Partajează
+              </Button>
+            )}
             {isOwner && (
               <Button variant="destructive" size="sm" onClick={() => void handleDeleteNote()}>
                 <MdDelete className="mr-1 h-4 w-4" /> Șterge
@@ -527,7 +629,9 @@ export function IsuNotesTab({ onEditingChange }: { onEditingChange?: (editing: b
         <div className="flex min-h-0 flex-1 flex-col px-4 pb-[max(0.75rem,env(safe-area-inset-bottom))] pt-3 md:mt-4 md:px-0 md:pb-0">
           {!isOwner && (
             <p className="mb-3 rounded-xl border border-amber-200 bg-amber-50 px-3 py-2 text-sm text-amber-900">
-              Notă comună de la {draft.ownerEmail || "alt utilizator"} — doar citire.
+              {draftAccess === "write"
+                ? `Notă partajată de ${draft.ownerEmail || "alt utilizator"} — poți edita conținutul.`
+                : `Notă ${draft.visibility === "common" ? "comună" : "partajată"} de ${draft.ownerEmail || "alt utilizator"} — doar citire.`}
             </p>
           )}
 
@@ -535,7 +639,7 @@ export function IsuNotesTab({ onEditingChange }: { onEditingChange?: (editing: b
             value={draft.title}
             onChange={(event) => updateDraft({ title: event.target.value })}
             placeholder="Titlul notei"
-            disabled={!isOwner}
+            disabled={!canEdit}
             aria-label="Titlul notei"
             className="h-auto rounded-none border-0 border-b border-border/70 bg-transparent px-0 py-2 text-[20px] font-semibold leading-snug shadow-none focus-visible:ring-0 focus-visible:ring-offset-2 focus-visible:ring-offset-background md:text-xl"
           />
@@ -553,7 +657,9 @@ export function IsuNotesTab({ onEditingChange }: { onEditingChange?: (editing: b
                     className={`inline-flex h-9 min-w-[44px] flex-1 items-center justify-center gap-1.5 rounded-[10px] px-3 text-sm font-medium transition md:flex-none ${
                       selected ? "bg-primary text-primary-foreground" : "text-muted-foreground"
                     }`}
-                    onClick={() => updateDraft({ visibility: value })}
+                    onClick={() => updateDraft(value === "common"
+                      ? { visibility: value, sharedWithUids: [], sharedWriteUids: [], sharedWithEmails: {} }
+                      : { visibility: value })}
                   >
                     {value === "private" ? <MdLock className="h-4 w-4" /> : <MdPeople className="h-4 w-4" />}
                     {value === "private" ? "Privat" : "Comun"}
@@ -606,7 +712,7 @@ export function IsuNotesTab({ onEditingChange }: { onEditingChange?: (editing: b
                     <span className="md:hidden">{index + 1}</span>
                     <span className="hidden md:inline">Pagina {index + 1}</span>
                   </button>
-                  {selected && isOwner && draft.pages.length > 1 && (
+                  {selected && canEdit && draft.pages.length > 1 && (
                     <DropdownMenu>
                       <DropdownMenuTrigger asChild>
                         <Button
@@ -632,7 +738,7 @@ export function IsuNotesTab({ onEditingChange }: { onEditingChange?: (editing: b
                 </div>
               )
             })}
-            {isOwner && (
+            {canEdit && (
               <Button
                 type="button"
                 size="icon"
@@ -650,11 +756,81 @@ export function IsuNotesTab({ onEditingChange }: { onEditingChange?: (editing: b
             <IsuNoteEditor
               key={currentPage?.id || "empty"}
               content={currentPage?.content || ""}
-              readOnly={!isOwner}
+              readOnly={!canEdit}
               onChange={handlePageContent}
             />
           </div>
         </div>
+
+        <Dialog open={shareDialogOpen} onOpenChange={setShareDialogOpen}>
+          <DialogContent className="max-h-[90vh] overflow-y-auto sm:max-w-lg">
+            <DialogHeader>
+              <DialogTitle>Partajează nota</DialogTitle>
+              <DialogDescription>
+                Alege conturile care au deja acces la ISU Notes. Read permite doar vizualizarea; Write permite editarea titlului și paginilor.
+              </DialogDescription>
+            </DialogHeader>
+            <Input
+              value={shareFilter}
+              onChange={(event) => setShareFilter(event.target.value)}
+              placeholder="Caută după email"
+              aria-label="Caută conturi după email"
+            />
+            <div className="max-h-[45vh] space-y-2 overflow-y-auto py-1">
+              {shareUsersLoading ? (
+                <p className="py-4 text-center text-sm text-muted-foreground">Se încarcă utilizatorii…</p>
+              ) : visibleShareUsers.length === 0 ? (
+                <p className="py-4 text-center text-sm text-muted-foreground">
+                  {shareUsers.length ? "Nu există conturi ISU Notes care să corespundă căutării." : "Nu s-au găsit conturi cu acces la ISU Notes."}
+                </p>
+              ) : (
+                visibleShareUsers.map((candidate) => {
+                  const access = shareDraft[candidate.uid]
+                  const accountIsEligible = eligibleShareUsers.some((item) => item.uid === candidate.uid)
+                  return (
+                    <div key={candidate.uid} className="flex min-h-14 items-center gap-3 rounded-lg border px-3 py-2">
+                      <Checkbox
+                        checked={Boolean(access)}
+                        aria-label={`Partajează cu ${candidate.email}`}
+                        onCheckedChange={(checked) => setShareDraft((current) => {
+                          const next = { ...current }
+                          if (checked) next[candidate.uid] = "read"
+                          else delete next[candidate.uid]
+                          return next
+                        })}
+                      />
+                      <span className="min-w-0 flex-1 truncate text-sm">{candidate.email}</span>
+                      {access && (
+                        <Select
+                          value={access}
+                          disabled={!accountIsEligible}
+                          onValueChange={(value) => setShareDraft((current) => ({
+                            ...current,
+                            [candidate.uid]: value as IsuNoteShareAccess,
+                          }))}
+                        >
+                          <SelectTrigger className="h-9 w-[112px]" aria-label={`Drept pentru ${candidate.email}`}>
+                            <SelectValue />
+                          </SelectTrigger>
+                          <SelectContent>
+                            <SelectItem value="read">Read</SelectItem>
+                            <SelectItem value="write">Write</SelectItem>
+                          </SelectContent>
+                        </Select>
+                      )}
+                    </div>
+                  )
+                })
+              )}
+            </div>
+            <DialogFooter>
+              <Button variant="outline" onClick={() => setShareDialogOpen(false)} disabled={shareSaving}>Anulează</Button>
+              <Button onClick={() => void handleSaveShares()} disabled={shareSaving || shareUsersLoading}>
+                {shareSaving ? "Se salvează…" : "Salvează accesul"}
+              </Button>
+            </DialogFooter>
+          </DialogContent>
+        </Dialog>
       </div>
     )
   }
