@@ -1,5 +1,5 @@
 import "@testing-library/jest-dom"
-import { render, screen, fireEvent, waitFor } from "@testing-library/react"
+import { render, screen, fireEvent, waitFor, within } from "@testing-library/react"
 import { CatdPage } from "@/components/catd-page"
 import { catdRequest } from "@/lib/catd-client"
 import type { CatdReadResult } from "@/lib/catd"
@@ -57,11 +57,14 @@ test("map supports independent status/state, filters, accent-insensitive search 
   render(<CatdPage />)
   await screen.findByTestId("catd-map")
   expect(screen.getByText("Sursă: CATD")).toBeInTheDocument()
+  fireEvent.click(screen.getByRole("button", { name: "Filtre" }))
   fireEvent.change(screen.getByLabelText("Funcționalitate"), { target: { value: "value:F" } })
+  expect(screen.getByText("2 / 2 hidranți")).toBeInTheDocument()
+  fireEvent.click(screen.getByRole("button", { name: "Vezi 1 hidrant" }))
   expect(screen.getByText("1 / 2 hidranți")).toBeInTheDocument()
-  expect(screen.queryByRole("button", { name: "H_FI_2" })).not.toBeInTheDocument()
+  expect(screen.queryByRole("button", { name: /H_FI_2 · Nefuncțional/ })).not.toBeInTheDocument()
   fireEvent.change(screen.getByLabelText("Caută cod, localitate sau stradă"), { target: { value: "targoviste" } })
-  fireEvent.click(screen.getByRole("button", { name: /H_TGV_1 —/ }))
+  fireEvent.click(screen.getByRole("button", { name: /H_TGV_1.*Republicii/ }))
   expect(screen.getByRole("dialog")).toHaveTextContent("Neconform")
   expect(screen.getByRole("dialog")).toHaveTextContent("Funcțional")
   expect(screen.getByRole("dialog")).toHaveTextContent("Nespecificat")
@@ -73,7 +76,7 @@ test("fallback identifies Firebase and the synchronization time", async () => {
   request.mockResolvedValue({ ...data, source: "firebase", syncedAt: "2026-10-31T10:00:00Z" })
   render(<CatdPage />)
   expect(await screen.findByText("Sursă: copie Firebase")).toBeInTheDocument()
-  expect(screen.getByText(/Ultima sincronizare:/)).toBeInTheDocument()
+  expect(screen.getByText(/Ultima sincronizare:/, { selector: "p" })).toBeInTheDocument()
   expect(screen.getByText(/ultima copie salvată/)).toBeInTheDocument()
 })
 test("unavailable sources display an error and can be retried", async () => {
@@ -82,4 +85,32 @@ test("unavailable sources display an error and can be retried", async () => {
   expect(await screen.findByRole("alert")).toHaveTextContent("Ambele surse indisponibile")
   fireEvent.click(screen.getByRole("button", { name: "Reîncearcă" }))
   expect(await screen.findByTestId("catd-map")).toBeInTheDocument()
+})
+
+test("quick status filters, individual removal and reset work without opening the panel", async () => {
+  render(<CatdPage />)
+  await screen.findByTestId("catd-map")
+  fireEvent.click(screen.getByRole("button", { name: "Nefuncționali" }))
+  expect(screen.getByText("1 / 2 hidranți")).toBeInTheDocument()
+  expect(screen.getByRole("button", { name: "Nefuncționali" })).toHaveAttribute("aria-pressed", "true")
+  fireEvent.click(screen.getByRole("button", { name: "Elimină filtrul Funcționalitate" }))
+  expect(screen.getByText("2 / 2 hidranți")).toBeInTheDocument()
+  fireEvent.click(screen.getByRole("button", { name: "Funcționali" }))
+  fireEvent.click(screen.getByRole("button", { name: "Resetează tot" }))
+  expect(screen.getByText("2 / 2 hidranți")).toBeInTheDocument()
+})
+test("closing draft filters keeps the applied selection and reset is applied explicitly", async () => {
+  render(<CatdPage />)
+  await screen.findByTestId("catd-map")
+  fireEvent.click(screen.getByRole("button", { name: "Funcționali" }))
+  fireEvent.click(screen.getByRole("button", { name: "Filtre, 1 active" }))
+  fireEvent.change(screen.getByLabelText("Localitate / UAT"), { target: { value: "value:Fieni" } })
+  expect(screen.getByText("Niciun hidrant pentru criteriile alese.")).toBeInTheDocument()
+  fireEvent.click(within(screen.getByRole("dialog")).getByRole("button", { name: "Close" }))
+  expect(screen.getByText("1 / 2 hidranți")).toBeInTheDocument()
+  fireEvent.click(screen.getByRole("button", { name: "Filtre, 1 active" }))
+  expect(screen.getByLabelText("Localitate / UAT")).toHaveValue("__all")
+  fireEvent.click(within(screen.getByRole("dialog")).getByRole("button", { name: "Resetează" }))
+  fireEvent.click(screen.getByRole("button", { name: "Vezi 2 hidranți" }))
+  expect(screen.getByText("2 / 2 hidranți")).toBeInTheDocument()
 })

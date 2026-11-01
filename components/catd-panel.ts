@@ -1,0 +1,1 @@
+export const CATD_PANEL_CLASS = "flex max-h-[90dvh] flex-col gap-0 rounded-t-3xl p-0 md:inset-y-0 md:left-auto md:right-0 md:h-full md:max-h-none md:w-[420px] md:rounded-none [&>button]:right-3 [&>button]:top-3 [&>button]:flex [&>button]:h-11 [&>button]:w-11 [&>button]:items-center [&>button]:justify-center"
