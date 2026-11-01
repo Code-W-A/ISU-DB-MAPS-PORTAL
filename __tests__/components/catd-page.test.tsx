@@ -21,6 +21,7 @@ jest.mock("@react-google-maps/api", () => {
   return {
     useJsApiLoader: () => ({ isLoaded: true }),
     GoogleMap: ({ children, onLoad }: any) => { React.useEffect(() => { onLoad(instance) }, [onLoad]); return <div data-testid="catd-map">{children}</div> },
+    Circle: ({ radius }: any) => <div data-testid="location-accuracy" data-radius={radius} />,
     MarkerClusterer: ({ children }: any) => children({}),
     Marker: ({ title, onClick }: any) => <button onClick={onClick}>{title}</button>,
     InfoWindow: ({ children, onCloseClick }: any) => <div role="dialog"><button onClick={onCloseClick}>Închide fișa</button>{children}</div>,
@@ -42,6 +43,7 @@ const data: CatdReadResult = {
 const request = catdRequest as jest.Mock
 beforeEach(() => {
   jest.clearAllMocks(); mockCatdAccess = true
+  Object.defineProperty(navigator, "geolocation", { configurable: true, value: undefined })
   request.mockResolvedValue(data)
   global.fetch = jest.fn().mockResolvedValue({ ok: true, json: async () => ({ apiKey: "maps-test" }) })
   ;(global.google.maps as any).LatLngBounds = class { extend() {} }
@@ -113,4 +115,59 @@ test("closing draft filters keeps the applied selection and reset is applied exp
   fireEvent.click(within(screen.getByRole("dialog")).getByRole("button", { name: "Resetează" }))
   fireEvent.click(screen.getByRole("button", { name: "Vezi 2 hidranți" }))
   expect(screen.getByText("2 / 2 hidranți")).toBeInTheDocument()
+})
+
+function mockLocation(position = { lat: 45.0001, lng: 25.5001 }) {
+  const reading = { coords: { latitude: position.lat, longitude: position.lng, accuracy: 12 }, timestamp: Date.now() } as GeolocationPosition
+  const api = { getCurrentPosition: jest.fn((success: PositionCallback, _error?: PositionErrorCallback, _options?: PositionOptions) => success(reading)), watchPosition: jest.fn(() => 7), clearWatch: jest.fn() }
+  Object.defineProperty(navigator, "geolocation", { configurable: true, value: api })
+  return api
+}
+test("automatically shows the user location and finds the actual nearest displayed hydrant", async () => {
+  const geo = mockLocation()
+  render(<CatdPage />)
+  await screen.findByTestId("catd-map")
+  expect(screen.getByRole("button", { name: "Locația ta" })).toBeInTheDocument()
+  expect(screen.getByTestId("location-accuracy")).toHaveAttribute("data-radius", "12")
+  expect(mockPanTo).toHaveBeenCalledWith({ lat: 45.0001, lng: 25.5001 })
+  expect(geo.getCurrentPosition).toHaveBeenCalledTimes(1)
+  fireEvent.click(screen.getByRole("button", { name: "Găsește cel mai apropiat hidrant" }))
+  const details = await screen.findByRole("dialog")
+  expect(details).toHaveTextContent("H_FI_2")
+  expect(details).toHaveTextContent("Nefuncțional")
+  expect(details).toHaveTextContent("în linie dreaptă")
+  expect(geo.getCurrentPosition).toHaveBeenCalledTimes(1)
+})
+test("nearest respects functionality filters and location button recenters the map", async () => {
+  mockLocation()
+  render(<CatdPage />)
+  await screen.findByTestId("catd-map")
+  fireEvent.click(screen.getByRole("button", { name: "Locația mea" }))
+  await waitFor(() => expect(mockZoom).toHaveBeenLastCalledWith(16))
+  fireEvent.click(screen.getByRole("button", { name: "Funcționali" }))
+  fireEvent.click(screen.getByRole("button", { name: "Găsește cel mai apropiat hidrant" }))
+  expect(await screen.findByRole("dialog")).toHaveTextContent("H_TGV_1")
+})
+test("a blocked location explains how to enable it and can be retried without selecting an arbitrary hydrant", async () => {
+  const geo = mockLocation()
+  geo.getCurrentPosition.mockImplementationOnce((_: any, fail: any) => fail({ code: 1 }))
+  render(<CatdPage />)
+  await screen.findByTestId("catd-map")
+  expect(screen.getByText(/Locația este blocată/)).toBeInTheDocument()
+  expect(screen.queryByRole("button", { name: "Locația ta" })).not.toBeInTheDocument()
+  expect(screen.queryByRole("dialog")).not.toBeInTheDocument()
+  fireEvent.click(screen.getByRole("button", { name: "Găsește cel mai apropiat hidrant" }))
+  const details = await screen.findByRole("dialog")
+  expect(details).toHaveTextContent("H_FI_2")
+  fireEvent.click(within(details).getByRole("button", { name: "Close" }))
+  expect(screen.getByRole("button", { name: "Locația ta" })).toBeInTheDocument()
+})
+test("an empty filtered map disables nearest and tracking is stopped on unmount", async () => {
+  const geo = mockLocation()
+  const view = render(<CatdPage />)
+  await screen.findByTestId("catd-map")
+  fireEvent.change(screen.getByLabelText("Caută cod, localitate sau stradă"), { target: { value: "does-not-exist" } })
+  expect(screen.getByRole("button", { name: "Găsește cel mai apropiat hidrant" })).toBeDisabled()
+  view.unmount()
+  expect(geo.clearWatch).toHaveBeenCalledWith(7)
 })

@@ -3,11 +3,12 @@
 import { CATD_PANEL_CLASS } from "@/components/catd-panel"
 import { Button } from "@/components/ui/button"
 import { Sheet, SheetContent, SheetDescription, SheetHeader, SheetTitle } from "@/components/ui/sheet"
+import { formatCatdDistance } from "@/lib/catd-location"
 import { catdValue, type CatdHydrant, type CatdReadResult } from "@/lib/catd"
 import { catdHydrantStatus } from "@/lib/catd-map-ui"
 
-export function CatdHydrantDetails({ hydrant, data, onClose }: {
-  hydrant: CatdHydrant | null; data: CatdReadResult; onClose: () => void
+export function CatdHydrantDetails({ hydrant, data, distanceMeters, onClose }: {
+  hydrant: CatdHydrant | null; data: CatdReadResult; distanceMeters?: number; onClose: () => void
 }) {
   const status = catdHydrantStatus(hydrant?.attributes.status)
   return <Sheet open={Boolean(hydrant)} onOpenChange={(open) => { if (!open) onClose() }}>
@@ -25,6 +26,7 @@ export function CatdHydrantDetails({ hydrant, data, onClose }: {
               <p className="break-words text-sm text-muted-foreground">{[hydrant.attributes.localitate ?? hydrant.attributes.uat, hydrant.attributes.strada].filter(Boolean).join(", ") || "Adresă nespecificată"}</p>
             </div>
           </div>
+          {distanceMeters !== undefined && <p className="mb-4 rounded-xl bg-blue-50 px-3 py-2 text-sm font-medium text-blue-800 dark:bg-blue-950 dark:text-blue-200">La aproximativ {formatCatdDistance(distanceMeters)} de tine, în linie dreaptă.</p>}
           <p className="mb-4 text-xs leading-relaxed text-muted-foreground">Presiunile sunt valori înregistrate de CATD, nu măsurători în timp real. Starea fizică și funcționalitatea sunt informații distincte.</p>
           <dl className="divide-y text-sm">
             {data.fields.map((field) => <div key={field.name} className="grid grid-cols-[minmax(0,1fr)_minmax(0,1.2fr)] gap-3 py-3">

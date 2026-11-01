@@ -1,11 +1,13 @@
 "use client"
 
 import { useCallback, useEffect, useMemo, useRef, useState } from "react"
-import { GoogleMap, Marker, MarkerClusterer, useJsApiLoader, type Libraries } from "@react-google-maps/api"
-import { ChevronDown, MapPin, RotateCw, Search, SlidersHorizontal, X } from "lucide-react"
+import { GoogleMap, Circle, Marker, MarkerClusterer, useJsApiLoader, type Libraries } from "@react-google-maps/api"
+import { ChevronDown, LocateFixed, MapPin, Navigation, RotateCw, Search, SlidersHorizontal, X } from "lucide-react"
 import { CatdFiltersPanel } from "@/components/catd-filters"
 import { CatdHydrantDetails } from "@/components/catd-hydrant-details"
 import { CATD_FILTER_FIELDS, catdHydrantStatus, filterCatdHydrants, type CatdFilters } from "@/lib/catd-map-ui"
+import { useCatdLocation } from "@/hooks/use-catd-location"
+import { catdDistanceMeters, nearestCatdHydrant, type CatdMapFocus, type CatdUserLocation } from "@/lib/catd-location"
 import { useAuth } from "@/components/auth-provider"
 import { ToolPageShell } from "@/components/tool-page-shell"
 import { Button } from "@/components/ui/button"
@@ -17,8 +19,8 @@ const mapStyle = { width: "100%", height: "100%" }
 const defaultCenter = { lat: 44.93, lng: 25.45 }
 const mapOptions = { gestureHandling: "greedy" as const, streetViewControl: false, mapTypeControl: true, fullscreenControl: false, clickableIcons: false }
 
-function CatdMap({ apiKey, data, filtered, selected, onSelect, onMapClick }: {
-  apiKey: string; data: CatdReadResult; filtered: CatdHydrant[]; selected: CatdHydrant | null; onSelect: (value: CatdHydrant | null) => void; onMapClick: () => void
+function CatdMap({ apiKey, data, filtered, focus, userLocation, onSelect, onMapClick }: {
+  apiKey: string; data: CatdReadResult; filtered: CatdHydrant[]; focus: CatdMapFocus | null; userLocation: CatdUserLocation | null; onSelect: (value: CatdHydrant | null) => void; onMapClick: () => void
 }) {
   const { isLoaded, loadError } = useJsApiLoader({ id: "google-map-script", googleMapsApiKey: apiKey, libraries, version: "weekly" })
   const [map, setMap] = useState<google.maps.Map | null>(null)
@@ -29,8 +31,16 @@ function CatdMap({ apiKey, data, filtered, selected, onSelect, onMapClick }: {
     setMap(instance)
   }, [data])
   useEffect(() => {
-    if (map && selected) { map.panTo(selected.position); map.setZoom(Math.max(map.getZoom() ?? 0, 17)) }
-  }, [map, selected])
+    if (!map || !focus) return
+    if (focus.kind === "nearest" && catdDistanceMeters(focus.origin, focus.position) > 10) {
+      const bounds = new google.maps.LatLngBounds()
+      bounds.extend(focus.origin); bounds.extend(focus.position)
+      map.fitBounds(bounds, 64)
+    } else {
+      map.panTo(focus.position)
+      map.setZoom(focus.kind === "location" ? 16 : Math.max(map.getZoom() ?? 0, 17))
+    }
+  }, [map, focus])
   const markerIcons = useMemo(() => {
     if (!isLoaded) return null
     const icon = (status: unknown) => ({ url: catdHydrantStatus(status).icon, scaledSize: new google.maps.Size(36, 44), anchor: new google.maps.Point(18, 43) })
@@ -40,6 +50,11 @@ function CatdMap({ apiKey, data, filtered, selected, onSelect, onMapClick }: {
   if (!isLoaded) return <p role="status" className="p-4">Se încarcă harta…</p>
   return (
     <GoogleMap mapContainerStyle={mapStyle} center={defaultCenter} zoom={10} options={mapOptions} onLoad={fitMap} onClick={onMapClick}>
+      {userLocation && <>
+        <Circle center={userLocation.position} radius={userLocation.accuracy} options={{ fillColor: "#2563eb", fillOpacity: 0.08, strokeColor: "#2563eb", strokeOpacity: 0.25, strokeWeight: 1, clickable: false }} />
+        <Marker position={userLocation.position} title="Locația ta" zIndex={10_000}
+          icon={{ path: google.maps.SymbolPath.CIRCLE, scale: 9, fillOpacity: 1, fillColor: "#2563eb", strokeColor: "#ffffff", strokeWeight: 3 }} />
+      </>}
       <MarkerClusterer>
         {(clusterer) => <>{filtered.map((hydrant) => (
           <Marker key={hydrant.id} position={hydrant.position} clusterer={clusterer}
@@ -68,6 +83,12 @@ export function CatdContent() {
   const [filtersOpen, setFiltersOpen] = useState(false)
   const filtersButtonRef = useRef<HTMLButtonElement>(null)
   const [draftFilters, setDraftFilters] = useState<CatdFilters>({})
+  const { location, locating, error: locationError, requestLocation } = useCatdLocation()
+  const [mapFocus, setMapFocus] = useState<CatdMapFocus | null>(null)
+  const initialLocationShown = useRef(false)
+  const [findingNearest, setFindingNearest] = useState(false)
+  const nearestBusy = useRef(false)
+  const [nearestError, setNearestError] = useState("")
 
   useEffect(() => {
     if (!user) return
@@ -92,8 +113,40 @@ export function CatdContent() {
   })), [data])
   const filtered = useMemo(() => filterCatdHydrants(data?.hydrants ?? [], filters, search), [data, search, filters])
   const previewCount = useMemo(() => filterCatdHydrants(data?.hydrants ?? [], draftFilters, search).length, [data, draftFilters, search])
+  const filteredRef = useRef(filtered)
+  filteredRef.current = filtered
+  const selectedDistance = selected && location ? catdDistanceMeters(location.position, selected.position) : undefined
   const activeFilters = CATD_FILTER_FIELDS.filter(([name]) => filters[name] !== undefined)
-  function resetAll() { setFilters({}); setSearch(""); setSearchOpen(false) }
+  function resetAll() { setFilters({}); setSearch(""); setSearchOpen(false); setNearestError("") }
+  function selectHydrant(hydrant: CatdHydrant | null) {
+    setSelected(hydrant); setSearchOpen(false)
+    if (hydrant) setMapFocus({ kind: "hydrant", position: hydrant.position })
+  }
+  async function showMyLocation() {
+    setNearestError(""); setSearchOpen(false)
+    try {
+      const current = await requestLocation()
+      setMapFocus({ kind: "location", position: current.position })
+    } catch { /* The location controls display the error from the hook. */ }
+  }
+  async function findNearest() {
+    if (nearestBusy.current) return
+    nearestBusy.current = true
+    setFindingNearest(true); setNearestError(""); setSearchOpen(false)
+    try {
+      const current = await requestLocation()
+      const result = nearestCatdHydrant(filteredRef.current, current.position)
+      if (!result) { setNearestError("Niciun hidrant corespunde filtrelor. Resetează filtrele sau căutarea."); return }
+      setSelected(result.hydrant)
+      setMapFocus({ kind: "nearest", position: result.hydrant.position, origin: current.position })
+    } catch { /* The location controls display the error from the hook. */ }
+    finally { nearestBusy.current = false; setFindingNearest(false) }
+  }
+  useEffect(() => {
+    if (!location || initialLocationShown.current) return
+    initialLocationShown.current = true
+    setMapFocus((current) => current ?? { kind: "location", position: location.position })
+  }, [location])
 
   useEffect(() => { if (selected && !filtered.some((item) => item.id === selected.id)) setSelected(null) }, [filtered, selected])
 
@@ -107,6 +160,7 @@ export function CatdContent() {
             <ChevronDown className="h-3.5 w-3.5 shrink-0 transition-transform group-open:rotate-180" aria-hidden="true" />
           </summary>
           <p className="pb-2 leading-relaxed text-muted-foreground">{data.source === "catd" ? "Citire CATD" : "Ultima sincronizare"}: {new Date(data.syncedAt ?? data.fetchedAt).toLocaleString("ro-RO", { timeZone: "Europe/Bucharest" })}</p>
+          <p className="flex items-center gap-1.5 pb-2 text-muted-foreground"><img src={catdHydrantStatus(null).icon} width={14} height={18} alt="" />Gri: alt status / necunoscut</p>
         </details> : <span className="text-muted-foreground">Hidranți CATD</span>}
         <div className="flex shrink-0 items-center gap-1">
           {data && <span className="tabular-nums text-muted-foreground">{filtered.length} / {data.hydrants.length} hidranți</span>}
@@ -155,7 +209,7 @@ export function CatdContent() {
           <Button variant="ghost" className="h-11 shrink-0 px-2 text-xs" onClick={resetAll}>Resetează tot</Button>
         </div>}
         {search.trim() && searchOpen && <div id="catd-search-results" className="absolute left-3 right-3 top-full z-30 mt-1 max-h-[35dvh] overflow-y-auto overscroll-contain rounded-xl border bg-background shadow-lg sm:left-4 sm:right-4" aria-label="Rezultate căutare">
-          {filtered.slice(0, 30).map((hydrant) => <button key={hydrant.id} className="flex min-h-14 w-full items-center gap-3 border-b px-3 py-3 text-left text-sm last:border-b-0 hover:bg-muted focus-visible:bg-muted" onClick={() => { setSelected(hydrant); setSearchOpen(false) }}>
+          {filtered.slice(0, 30).map((hydrant) => <button key={hydrant.id} className="flex min-h-14 w-full items-center gap-3 border-b px-3 py-3 text-left text-sm last:border-b-0 hover:bg-muted focus-visible:bg-muted" onClick={() => selectHydrant(hydrant)}>
             <img src={catdHydrantStatus(hydrant.attributes.status).icon} width={24} height={30} alt={catdHydrantStatus(hydrant.attributes.status).label} className="shrink-0" />
             <span className="min-w-0"><span className="block truncate font-medium">{String(hydrant.attributes.cod_unic_identificare ?? hydrant.id)}</span><span className="block truncate text-xs text-muted-foreground">{[hydrant.attributes.localitate ?? hydrant.attributes.uat, hydrant.attributes.strada].filter(Boolean).join(", ") || "Adresă nespecificată"}</span></span>
           </button>)}
@@ -166,13 +220,26 @@ export function CatdContent() {
       </>}
     </section>
     <div className="relative min-h-0 flex-1" aria-label="Harta hidranților CATD">
-      {data && apiKey && <CatdMap apiKey={apiKey} data={data} filtered={filtered} selected={selected} onSelect={(value) => { setSelected(value); setSearchOpen(false) }} onMapClick={() => setSearchOpen(false)} />}
-      {data && <div className="pointer-events-none absolute bottom-10 left-3 rounded-lg border bg-background/95 px-2 py-1.5 text-[11px] shadow-sm"><span className="flex items-center gap-1.5"><img src={catdHydrantStatus(null).icon} width={14} height={18} alt="" />Gri: alt status / necunoscut</span></div>}
+      {data && apiKey && <CatdMap apiKey={apiKey} data={data} filtered={filtered} focus={mapFocus} userLocation={location} onSelect={selectHydrant} onMapClick={() => setSearchOpen(false)} />}
+      {data && <div className="absolute bottom-10 left-3 right-3 z-10 flex flex-col items-start gap-2 sm:right-auto sm:max-w-sm">
+        {(nearestError || locationError || locating || location) && <p role="status" className={`max-w-full rounded-xl border bg-background/95 px-3 py-2 text-xs leading-relaxed shadow-sm ${nearestError || locationError ? "text-amber-800 dark:text-amber-300" : "text-muted-foreground"}`}>
+          {nearestError || locationError || (locating ? "Se caută poziția ta. Permite accesul la locație dacă browserul solicită acest lucru." : `Poziția ta · precizie ±${Math.ceil(location!.accuracy)} m`)}
+        </p>}
+        <div className="flex w-full items-center gap-2">
+          <Button className="h-12 min-w-0 flex-1 gap-2 rounded-xl px-4 shadow-md" disabled={loading || findingNearest || filtered.length === 0} onClick={() => void findNearest()} title="Cel mai apropiat dintre hidranții afișați, conform filtrelor" aria-label="Găsește cel mai apropiat hidrant">
+            <Navigation className={`h-5 w-5 shrink-0 ${findingNearest ? "animate-pulse" : ""}`} aria-hidden="true" />{findingNearest ? "Se caută…" : "Cel mai apropiat"}
+          </Button>
+          <Button size="icon" variant="outline" className="h-12 w-12 shrink-0 rounded-xl bg-background shadow-md" disabled={locating} onClick={() => void showMyLocation()} aria-label="Locația mea" title="Arată locația mea pe hartă">
+            <LocateFixed className={`h-5 w-5 ${locating ? "animate-pulse" : location ? "text-blue-600" : ""}`} aria-hidden="true" />
+          </Button>
+        </div>
+        <p className="rounded bg-background/90 px-2 py-0.5 text-[10px] text-muted-foreground">Caută în hidranții afișați · distanță în linie dreaptă</p>
+      </div>}
     </div>
     {data && <>
       <CatdFiltersPanel open={filtersOpen} onOpenChange={setFiltersOpen} draft={draftFilters} onChange={setDraftFilters} options={options} count={previewCount} onCloseFocus={() => filtersButtonRef.current?.focus({ preventScroll: true })}
         onApply={() => { setFilters({ ...draftFilters }); setFiltersOpen(false) }} />
-      <CatdHydrantDetails hydrant={selected} data={data} onClose={() => setSelected(null)} />
+      <CatdHydrantDetails hydrant={selected} data={data} distanceMeters={selectedDistance} onClose={() => setSelected(null)} />
     </>}
   </div>
 }

@@ -48,3 +48,13 @@ npx jest --runInBand __tests__/lib/catd-source.test.ts __tests__/lib/catd-server
 ```
 
 Testele folosesc surse și Firebase simulate și nu creează documente live. Prima sincronizare reală este o operație separată, pornită din dashboard.
+
+## Localizare și cel mai apropiat hidrant
+
+La deschiderea paginii, browserul solicită locația dacă nu are deja permisiune. Poziția este afișată cu un punct albastru și un cerc de precizie și este actualizată cât timp pagina rămâne deschisă. Butonul „Locația mea” recentrează harta; deplasările ulterioare nu recentrează automat harta. La ieșirea din pagină, urmărirea este oprită.
+
+„Cel mai apropiat” caută în hidranții afișați, respectând toate filtrele și căutarea. Nu impune automat funcționalitatea: pentru cel mai apropiat hidrant funcțional, se selectează mai întâi „Funcționali”. Distanța este Haversine, în linie dreaptă, afișată în fișa hidrantului; nu este distanță rutieră. Harta încadrează poziția utilizatorului și hidrantul ales. Dacă GPS-ul răspunde după modificarea filtrelor, se folosesc filtrele actuale.
+
+O solicitare GPS în curs este reutilizată de butoane, iar o poziție mai veche de 15 secunde se cere din nou înaintea căutării. Refuzul permisiunii, lipsa semnalului, timeout-ul, datele GPS invalide sau conexiunea HTTP nesecurizată nu produc un hidrant selectat arbitrar. Interfața indică problema și permite reîncercarea. Coordonatele utilizatorului nu sunt salvate în Firebase și nu sunt trimise API-urilor aplicației.
+
+Testele suplimentare sunt `__tests__/lib/catd-location.test.ts`, `__tests__/hooks/use-catd-location.test.tsx` și scenariile de localizare din testele paginii; folosesc poziții simulate, fără GPS real.
