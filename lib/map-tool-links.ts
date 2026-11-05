@@ -1,3 +1,5 @@
+import { normalizeUserEmail } from "@/lib/user-role-utils"
+
 export const MAIN_ADMIN_EMAIL = "radu.p1995@yahoo.com"
 
 export const MAP_TOOL_LINK_TAB_LEGACY_INDRUMATOR = "indrumator"
@@ -49,7 +51,7 @@ export function getMapToolLinkFlags(params: {
   email: string | null
   allowedTabs: string[] | undefined
 }): MapToolLinkFlags {
-  if (params.email === MAIN_ADMIN_EMAIL) {
+  if (normalizeUserEmail(params.email) === MAIN_ADMIN_EMAIL) {
     return {
       showIndrumatorLink: true,
       showProcesVerbalLink: true,

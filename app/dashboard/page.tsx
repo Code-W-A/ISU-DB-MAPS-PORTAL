@@ -32,6 +32,7 @@ import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/com
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs"
 import { Toaster } from "@/components/ui/toaster"
 import { getAllUsers, hasFullAccess } from "@/lib/role-service"
+import { findUserRoleForAuthUser, normalizeUserEmail } from "@/lib/user-role-utils"
 import type { UserRole } from "@/types/user-role"
 
 const DASHBOARD_TAB_VALUES = [
@@ -64,7 +65,7 @@ export default function DashboardPage() {
         return
       }
 
-      if (user.email === "radu.p1995@yahoo.com") {
+      if (normalizeUserEmail(user.email) === "radu.p1995@yahoo.com") {
         setAllowedTabs([...DASHBOARD_TAB_VALUES])
         try {
           setUsers(await getAllUsers())
@@ -84,7 +85,7 @@ export default function DashboardPage() {
         }
 
         const allUsers = await getAllUsers()
-        const currentUser = allUsers.find((entry) => entry.email === user.email || entry.uid === user.uid)
+        const currentUser = findUserRoleForAuthUser(allUsers, user)
 
         setAllowedTabs(currentUser?.allowedTabs ?? [])
         setUsers(allUsers)
@@ -213,7 +214,7 @@ export default function DashboardPage() {
               <CardHeader>
                 <CardTitle>Gestionare Acces Utilizatori</CardTitle>
                 <CardDescription>
-                  {user?.email === "radu.p1995@yahoo.com"
+                  {normalizeUserEmail(user?.email) === "radu.p1995@yahoo.com"
                     ? "Adaugă sau elimină utilizatori care pot accesa dashboard-ul și setează ce taburi pot vedea."
                     : "Lista utilizatorilor cu acces la dashboard."}
                 </CardDescription>
@@ -297,7 +298,7 @@ export default function DashboardPage() {
 
         {dashboardTabs.includes("settings") && (
           <TabsContent value="settings" className="space-y-6">
-            {user?.email === "radu.p1995@yahoo.com" && <CatdSyncControl />}
+            {normalizeUserEmail(user?.email) === "radu.p1995@yahoo.com" && <CatdSyncControl />}
             <LegislatieSyncControl />
             <DataSourceToggle />
           </TabsContent>

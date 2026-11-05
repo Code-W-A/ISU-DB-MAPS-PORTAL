@@ -4,6 +4,7 @@ import { useEffect, useState } from "react"
 import type { User } from "firebase/auth"
 import { getMapToolLinkFlags, MAIN_ADMIN_EMAIL, type MapToolLinkFlags } from "@/lib/map-tool-links"
 import { getAllUsers, getPreventionZonesAccessForAuthUser, hasFullAccess } from "@/lib/role-service"
+import { findUserRoleForAuthUser, normalizeUserEmail } from "@/lib/user-role-utils"
 
 const emptyFlags: MapToolLinkFlags = {
   showIndrumatorLink: false,
@@ -29,7 +30,7 @@ const DASHBOARD_TAB_VALUES = new Set([
 export type MapToolLinkLoadMode = "mapHome" | "preventionOrTool"
 
 export async function loadHasDashboardAccess(user: { uid: string; email: string | null }): Promise<boolean> {
-  if (user.email === MAIN_ADMIN_EMAIL) {
+  if (normalizeUserEmail(user.email) === MAIN_ADMIN_EMAIL) {
     return true
   }
 
@@ -38,7 +39,7 @@ export async function loadHasDashboardAccess(user: { uid: string; email: string 
 
   try {
     const users = await getAllUsers()
-    const self = users.find((u) => u.email === user.email || u.uid === user.uid)
+    const self = findUserRoleForAuthUser(users, user)
     return Boolean(self?.allowedTabs?.some((tab) => DASHBOARD_TAB_VALUES.has(tab)))
   } catch {
     return false
@@ -51,7 +52,7 @@ export async function loadMapToolLinkFlags(
 ): Promise<MapToolLinkFlags> {
   if (!user.email) return emptyFlags
 
-  if (user.email === MAIN_ADMIN_EMAIL) {
+  if (normalizeUserEmail(user.email) === MAIN_ADMIN_EMAIL) {
     return getMapToolLinkFlags({ email: user.email, allowedTabs: undefined })
   }
 
@@ -69,7 +70,7 @@ export async function loadMapToolLinkFlags(
 
   try {
     const list = await getAllUsers()
-    const current = list.find((u) => u.email === user.email || u.uid === user.uid)
+    const current = findUserRoleForAuthUser(list, user)
     const flags = getMapToolLinkFlags({ email: user.email, allowedTabs: current?.allowedTabs })
     return { ...flags, showCatdLink: full && flags.showCatdLink }
   } catch {

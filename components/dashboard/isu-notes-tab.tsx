@@ -30,6 +30,7 @@ import { downloadIsuNotePdf } from "@/lib/isu-notes-pdf"
 import { plainTextFromHtml } from "@/lib/isu-notes-html"
 import { getAllUsers } from "@/lib/role-service"
 import { MAIN_ADMIN_EMAIL } from "@/lib/map-tool-links"
+import { normalizeUserEmail } from "@/lib/user-role-utils"
 import { buildIsuNoteSharingFields, getIsuNoteAccess, getIsuNoteShares } from "@/lib/isu-notes-sharing"
 import {
   createEmptyPage,
@@ -353,7 +354,11 @@ export function IsuNotesTab({ onEditingChange }: { onEditingChange?: (editing: b
     const seen = new Set<string>()
     return shareUsers.filter((candidate) => {
       if (!candidate.uid || candidate.uid === uid || !candidate.email) return false
-      if (candidate.email !== MAIN_ADMIN_EMAIL && !candidate.allowedTabs?.includes("isuNotes")) return false
+      // Email-keyed legacy role documents are not Firebase auth UIDs and cannot
+      // satisfy the note-sharing Firestore UID checks.
+      if (normalizeUserEmail(candidate.uid) === normalizeUserEmail(candidate.email)) return false
+      if (normalizeUserEmail(candidate.email) === normalizeUserEmail(email)) return false
+      if (normalizeUserEmail(candidate.email) !== MAIN_ADMIN_EMAIL && !candidate.allowedTabs?.includes("isuNotes")) return false
       if (seen.has(candidate.uid)) return false
       seen.add(candidate.uid)
       return true

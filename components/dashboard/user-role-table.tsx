@@ -15,6 +15,7 @@ import { useAuth } from "@/components/auth-provider"
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select"
 import { Dialog, DialogContent, DialogDescription, DialogHeader, DialogTitle } from "@/components/ui/dialog"
 import { useMobile } from "@/hooks/use-mobile"
+import { normalizeUserEmail } from "@/lib/user-role-utils"
 import {
   MAP_TOOL_LINK_TAB_INDRUMATOR,
   MAP_TOOL_LINK_TAB_PROCES_VERBAL,
@@ -68,7 +69,7 @@ export function UserRoleTable({ initialUsers }: UserRoleTableProps) {
   const [openTabsForUid, setOpenTabsForUid] = useState<string | null>(null)
   const [openZonesForUid, setOpenZonesForUid] = useState<string | null>(null)
 
-  const isTableAdmin = user?.email === "radu.p1995@yahoo.com"
+  const isTableAdmin = normalizeUserEmail(user?.email) === "radu.p1995@yahoo.com"
 
   useEffect(() => {
     if (!isMobile) {
@@ -79,8 +80,9 @@ export function UserRoleTable({ initialUsers }: UserRoleTableProps) {
 
   const handleAddUser = async (e: React.FormEvent) => {
     e.preventDefault()
+    const email = normalizeUserEmail(newUserEmail)
 
-    if (!newUserEmail || !newUserEmail.includes("@")) {
+    if (!email || !email.includes("@")) {
       toast({
         title: "Eroare",
         description: "Introduceți o adresă de email validă",
@@ -101,7 +103,7 @@ export function UserRoleTable({ initialUsers }: UserRoleTableProps) {
     setIsLoading(true)
 
     try {
-      const exists = await checkEmailExists(newUserEmail)
+      const exists = await checkEmailExists(email)
       if (exists) {
         toast({
           title: "Eroare",
@@ -112,11 +114,11 @@ export function UserRoleTable({ initialUsers }: UserRoleTableProps) {
         return
       }
 
-      const tempUid = newUserEmail
+      const tempUid = email
 
       const success = await addUserWithFullAccess(
         tempUid,
-        newUserEmail,
+        email,
         user?.email || "admin",
         newUserTabs,
         newUserPreventionAccess,
@@ -125,7 +127,7 @@ export function UserRoleTable({ initialUsers }: UserRoleTableProps) {
       if (success) {
         const newUser: UserRole = {
           uid: tempUid,
-          email: newUserEmail,
+          email,
           fullAccess: true,
           addedBy: user?.email || "admin",
           addedAt: Date.now(),

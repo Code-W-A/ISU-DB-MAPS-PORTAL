@@ -4,6 +4,7 @@ import { useState, useEffect } from "react"
 import { useAuth } from "@/components/auth-provider"
 import { hasFullAccess } from "@/lib/role-service"
 import { MAIN_ADMIN_EMAIL } from "@/lib/map-tool-links"
+import { normalizeUserEmail } from "@/lib/user-role-utils"
 import { Map } from "@/components/map"
 import { GoogleMapsLoader } from "@/components/google-maps-loader"
 import { MapLocationSearchProvider } from "@/components/map-location-search-bridge"
@@ -25,7 +26,7 @@ export function MapContainer() {
         setHasAccess(false)
         return
       }
-      if (user.email === MAIN_ADMIN_EMAIL) {
+      if (normalizeUserEmail(user.email) === MAIN_ADMIN_EMAIL) {
         setIsAdminForMap(true)
         setHasAccess(true)
         return

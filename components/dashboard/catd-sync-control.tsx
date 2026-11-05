@@ -6,6 +6,7 @@ import { Button } from "@/components/ui/button"
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card"
 import { catdRequest } from "@/lib/catd-client"
 import { MAIN_ADMIN_EMAIL } from "@/lib/map-tool-links"
+import { normalizeUserEmail } from "@/lib/user-role-utils"
 import type { CatdSyncStatus } from "@/lib/catd"
 
 export function CatdSyncControl() {
@@ -14,7 +15,7 @@ export function CatdSyncControl() {
   const [busy, setBusy] = useState(false)
   const [error, setError] = useState("")
   const [message, setMessage] = useState("")
-  const isAdmin = user?.email === MAIN_ADMIN_EMAIL
+  const isAdmin = normalizeUserEmail(user?.email) === MAIN_ADMIN_EMAIL
   const loadStatus = useCallback(async (signal?: AbortSignal) => {
     if (!user || !isAdmin) return
     try {
