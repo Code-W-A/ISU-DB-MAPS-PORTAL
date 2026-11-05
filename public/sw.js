@@ -152,7 +152,12 @@ self.addEventListener("fetch", (event) => {
 })
 
 self.addEventListener("push", (event) => {
-  const data = event.data ? event.data.json() : { title: "Notificare", body: "", url: "/" }
+  let data = { title: "Notificare", body: "", url: "/", tag: "" }
+  try {
+    data = event.data ? { ...data, ...event.data.json() } : data
+  } catch {
+    data.body = event.data?.text() || ""
+  }
 
   const options = {
     body: data.body,
@@ -162,6 +167,7 @@ self.addEventListener("push", (event) => {
     data: {
       url: data.url || "/",
     },
+    ...(data.tag ? { tag: data.tag, renotify: false } : {}),
   }
 
   event.waitUntil(self.registration.showNotification(data.title || "Notificare", options))

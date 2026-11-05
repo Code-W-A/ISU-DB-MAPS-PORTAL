@@ -144,7 +144,9 @@ export function IsuNotesTab({ onEditingChange }: { onEditingChange?: (editing: b
   const [shareDraft, setShareDraft] = useState<Record<string, IsuNoteShareAccess>>({})
   const [shareSaving, setShareSaving] = useState(false)
   const saveTimer = useRef<ReturnType<typeof setTimeout> | null>(null)
+  const notificationTimers = useRef(new Map<string, ReturnType<typeof setTimeout>>())
   const draftRef = useRef<IsuNote | null>(null)
+  const deepLinkHandled = useRef(false)
 
   const uid = user?.uid || ""
   const email = user?.email || ""
@@ -158,6 +160,33 @@ export function IsuNotesTab({ onEditingChange }: { onEditingChange?: (editing: b
     onEditingChange?.(isEditingNote)
     return () => onEditingChange?.(false)
   }, [isEditingNote, onEditingChange])
+
+  const notifyCollaborators = useCallback(async (noteId: string, event: "shared" | "updated", recipientUids?: string[]) => {
+    if (!user) return
+    const token = await user.getIdToken()
+    const response = await fetch("/api/isu-notes/push/notify", {
+      method: "POST",
+      headers: { "Content-Type": "application/json", Authorization: `Bearer ${token}` },
+      body: JSON.stringify({ noteId, event, recipientUids }),
+      cache: "no-store",
+    })
+    if (!response.ok) {
+      const result = await response.json().catch(() => ({})) as { error?: string }
+      throw new Error(result.error || "Notificarea colaboratorilor a eșuat.")
+    }
+  }, [user])
+
+  const scheduleUpdateNotification = useCallback((noteId: string) => {
+    const existingTimer = notificationTimers.current.get(noteId)
+    if (existingTimer) clearTimeout(existingTimer)
+    const timer = setTimeout(() => {
+      notificationTimers.current.delete(noteId)
+      void notifyCollaborators(noteId, "updated").catch((error) => {
+        console.error("ISU Notes push notification failed:", error)
+      })
+    }, 20_000)
+    notificationTimers.current.set(noteId, timer)
+  }, [notifyCollaborators])
 
   useEffect(() => {
     if (!uid) return
@@ -202,6 +231,15 @@ export function IsuNotesTab({ onEditingChange }: { onEditingChange?: (editing: b
     }
   }, [uid])
 
+  useEffect(() => {
+    if (deepLinkHandled.current || typeof window === "undefined") return
+    const noteId = new URLSearchParams(window.location.search).get("note")
+    if (!noteId || !notes.some((note) => note.id === noteId)) return
+    deepLinkHandled.current = true
+    setSelectedNoteId(noteId)
+    window.history.replaceState(window.history.state, "", `${window.location.pathname}${window.location.hash}`)
+  }, [notes])
+
   const selectedFromList = useMemo(
     () => notes.find((note) => note.id === selectedNoteId) || null,
     [notes, selectedNoteId],
@@ -244,12 +282,15 @@ export function IsuNotesTab({ onEditingChange }: { onEditingChange?: (editing: b
         : { title: note.title, pages: note.pages }
       await updateIsuNote(note.id, patch)
       setSaveState("saved")
+      if (note.visibility === "private" && note.sharedWithUids.length > 0) {
+        scheduleUpdateNotification(note.id)
+      }
     } catch (error) {
       console.error(error)
       setSaveState("idle")
       toast({ title: "Eroare", description: "Salvarea notei a eșuat.", variant: "destructive" })
     }
-  }, [uid])
+  }, [uid, scheduleUpdateNotification])
 
   const scheduleSave = useCallback(
     (next: IsuNote) => {
@@ -363,7 +404,7 @@ export function IsuNotesTab({ onEditingChange }: { onEditingChange?: (editing: b
       seen.add(candidate.uid)
       return true
     })
-  }, [shareUsers, uid])
+  }, [email, shareUsers, uid])
 
   const visibleShareUsers = useMemo(() => {
     const known = new Set(eligibleShareUsers.map((candidate) => candidate.uid))
@@ -393,10 +434,23 @@ export function IsuNotesTab({ onEditingChange }: { onEditingChange?: (editing: b
         folderId: draft.folderId,
         ...fields,
       })
+      const newlySharedUids = fields.sharedWithUids.filter((shareUid) => !draft.sharedWithUids.includes(shareUid))
+      let notificationError: string | null = null
+      if (newlySharedUids.length > 0) {
+        try {
+          await notifyCollaborators(draft.id, "shared", newlySharedUids)
+        } catch (error) {
+          console.error("ISU Notes share notification failed:", error)
+          notificationError = error instanceof Error ? error.message : "Notificarea nu a putut fi trimisă."
+        }
+      }
       const updated = { ...draft, ...fields, updatedAt: Date.now() }
       setDraft(updated)
       setShareDialogOpen(false)
-      toast({ title: "Acces actualizat" })
+      toast({
+        title: "Acces actualizat",
+        ...(notificationError ? { description: notificationError } : {}),
+      })
     } catch (error) {
       console.error(error)
       toast({ title: "Eroare", description: "Drepturile de acces nu au putut fi salvate.", variant: "destructive" })

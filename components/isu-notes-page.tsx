@@ -10,6 +10,7 @@ import { IsuNotesTab } from "@/components/dashboard/isu-notes-tab"
 import { useMapAppNavPermissions } from "@/hooks/use-map-app-nav-permissions"
 import { MdMenu } from "react-icons/md"
 import { cn } from "@/lib/utils"
+import { IsuNotesPushSettings } from "@/components/isu-notes-push-settings"
 
 export function IsuNotesPage() {
   const { user, loading } = useAuth()
@@ -92,6 +93,7 @@ export function IsuNotesPage() {
         <span className="hidden min-w-0 max-w-[14rem] shrink-0 truncate text-xs text-muted-foreground md:flex">
           {user.email}
         </span>
+        <IsuNotesPushSettings />
       </header>
       <main
         className={cn(
