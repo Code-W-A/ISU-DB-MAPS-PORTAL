@@ -288,11 +288,9 @@ function EditorSidebarBody({
 }
 
 export function PreventionFullPageMap({
-  apiKey,
   access,
   allUsers,
 }: {
-  apiKey?: string | null
   access: "read" | "write"
   allUsers: UserRole[]
 }) {
@@ -300,8 +298,8 @@ export function PreventionFullPageMap({
   const { isMobile } = useMobile()
   const [panelOpen, setPanelOpen] = useState(false)
   const [panelTab, setPanelTab] = useState<"tools" | "zones">("tools")
-  const mapRef = useRef<google.maps.Map | null>(null)
-  const [mapInstance, setMapInstance] = useState<google.maps.Map | null>(null)
+  const mapRef = useRef<import("@/types/open-map").OpenMapInstance | null>(null)
+  const [mapInstance, setMapInstance] = useState<import("@/types/open-map").OpenMapInstance | null>(null)
   const [locationSearchResult, setLocationSearchResult] = useState<{
     lat: number
     lng: number
@@ -312,20 +310,19 @@ export function PreventionFullPageMap({
   const editor = usePreventionZonesEditor(access, user, allUsers)
   const { zones, drawnPath, setDrawnPath, showExistingOnMap } = editor
 
-  const { registerMapLocationSelectHandler, setMapsScriptReady } = useMapLocationSearchBridge()
+  const { registerMapLocationSelectHandler, setMapReady } = useMapLocationSearchBridge()
 
   const handleLocationSelect = useCallback(
-    (place: google.maps.places.PlaceResult) => {
-      if (!place.geometry?.location) return
-      const lat = place.geometry.location.lat()
-      const lng = place.geometry.location.lng()
+    (place: import("@/types/open-map").MapSearchResult) => {
+      const lat = place.lat
+      const lng = place.lng
       mapRef.current?.panTo({ lat, lng })
       mapRef.current?.setZoom(16)
       if (!user) return
       setLocationSearchResult({
         lat,
         lng,
-        address: place.formatted_address || place.name || "",
+        address: place.address || place.name || "",
         preventionMatches: findPreventionZonesForPoint(zones, { lat, lng }, { uid: user.uid, email: user.email }),
       })
     },
@@ -344,7 +341,6 @@ export function PreventionFullPageMap({
 
   const mapSection = (
     <PreventionZonePathMap
-      apiKey={apiKey ?? undefined}
       variant="fullscreen"
       path={drawnPath}
       onPathChange={setDrawnPath}
@@ -357,7 +353,7 @@ export function PreventionFullPageMap({
         mapRef.current = m
         setMapInstance(m)
       }}
-      onMapScriptReady={(ready) => setMapsScriptReady(Boolean(ready))}
+      onMapReadyChange={(ready) => setMapReady(Boolean(ready))}
     />
   )
 

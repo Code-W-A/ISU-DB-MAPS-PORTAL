@@ -2,7 +2,8 @@
 
 import type { CSSProperties } from "react"
 import { useCallback, useEffect, useMemo, useRef, useState } from "react"
-import { GoogleMap, useJsApiLoader, Marker, Polygon, InfoWindow } from "@react-google-maps/api"
+import { OpenMap, OpenMarker, OpenPolygon, OpenPopup, OpenLatLngBounds } from "@/components/open-map"
+import type { OpenMapInstance } from "@/types/open-map"
 import { Button } from "@/components/ui/button"
 import { Skeleton } from "@/components/ui/skeleton"
 import type { PreventionZone, PreventionZoneMatch } from "@/types/prevention-zone"
@@ -15,7 +16,6 @@ const containerStyleDashboard: CSSProperties = { width: "100%", height: "min(420
 const containerStyleFullscreen: CSSProperties = { width: "100%", height: "100%" }
 
 interface PreventionZonePathMapInnerProps {
-  apiKey: string
   path: Array<{ lat: number; lng: number }>
   onPathChange: (path: Array<{ lat: number; lng: number }>) => void
   existingZones: PreventionZone[]
@@ -23,8 +23,8 @@ interface PreventionZonePathMapInnerProps {
   variant?: "default" | "fullscreen"
   /** false = vizualizare fără adăugare puncte (ex. acces read pe /prevenire) */
   drawingEnabled?: boolean
-  onMapScriptReady?: (ready: boolean) => void
-  /** Rezultat căutare adresă (marker + fereastră) — randat în interiorul GoogleMap. */
+  onMapReadyChange?: (ready: boolean) => void
+  /** Rezultat căutare adresă (marker + fereastră) — randat în interiorul OpenMap. */
   locationSearchResult?: {
     lat: number
     lng: number
@@ -32,38 +32,27 @@ interface PreventionZonePathMapInnerProps {
     preventionMatches?: PreventionZoneMatch[]
   } | null
   onCloseLocationSearch?: () => void
-  onMapReady?: (map: google.maps.Map) => void
+  onMapReady?: (map: OpenMapInstance) => void
 }
 
 function PreventionZonePathMapInner({
-  apiKey,
   path,
   onPathChange,
   existingZones,
   showExistingLayers,
   variant = "default",
   drawingEnabled = true,
-  onMapScriptReady,
+  onMapReadyChange,
   locationSearchResult,
   onCloseLocationSearch,
   onMapReady,
 }: PreventionZonePathMapInnerProps) {
-  const mapRef = useRef<google.maps.Map | null>(null)
-
-  const { isLoaded, loadError } = useJsApiLoader({
-    id: "google-map-script",
-    googleMapsApiKey: apiKey,
-    libraries: ["places"],
-    version: "weekly",
-  })
+  const mapRef = useRef<OpenMapInstance | null>(null)
+  const isLoaded = true
 
   useEffect(() => {
-    onMapScriptReady?.(isLoaded)
-  }, [isLoaded, onMapScriptReady])
-
-  useEffect(() => {
-    return () => onMapScriptReady?.(false)
-  }, [onMapScriptReady])
+    return () => onMapReadyChange?.(false)
+  }, [onMapReadyChange])
 
   const mapOptions = useMemo(
     () => ({
@@ -78,7 +67,7 @@ function PreventionZonePathMapInner({
   )
 
   const handleMapClick = useCallback(
-    (e: google.maps.MapMouseEvent) => {
+    (e: { latLng: { lat: () => number; lng: () => number } }) => {
       if (!drawingEnabled || !e.latLng) return
       onPathChange([...path, { lat: e.latLng.lat(), lng: e.latLng.lng() }])
     },
@@ -95,15 +84,11 @@ function PreventionZonePathMapInner({
 
   const fitZoneInView = useCallback((zone: PreventionZone) => {
     const map = mapRef.current
-    if (!map || typeof window === "undefined" || !window.google?.maps) return
-    const bounds = new window.google.maps.LatLngBounds()
+    if (!map) return
+    const bounds = new OpenLatLngBounds()
     zone.path.forEach((p) => bounds.extend(p))
     map.fitBounds(bounds, 40)
   }, [])
-
-  if (loadError) {
-    return <p className="text-sm text-destructive">Nu s-a putut încărca Google Maps.</p>
-  }
 
   if (!isLoaded) {
     return (
@@ -166,7 +151,7 @@ function PreventionZonePathMapInner({
   )
 
   const mapBlock = (
-        <GoogleMap
+        <OpenMap
           mapContainerStyle={mapContainerStyle}
           center={DEFAULT_CENTER}
           zoom={10}
@@ -174,12 +159,13 @@ function PreventionZonePathMapInner({
           onLoad={(m) => {
             mapRef.current = m
             onMapReady?.(m)
+            onMapReadyChange?.(true)
           }}
           options={mapOptions}
         >
           {showExistingLayers &&
             existingZones.map((z) => (
-              <Polygon
+              <OpenPolygon
                 key={`existing-${z.id}`}
                 paths={z.path}
                 options={{
@@ -194,10 +180,10 @@ function PreventionZonePathMapInner({
               />
             ))}
           {path.map((pt, i) => (
-            <Marker key={`${i}-${pt.lat.toFixed(5)}-${pt.lng.toFixed(5)}`} position={pt} zIndex={5} />
+            <OpenMarker key={`${i}-${pt.lat.toFixed(5)}-${pt.lng.toFixed(5)}`} position={pt} zIndex={5} />
           ))}
           {path.length >= 3 && (
-            <Polygon
+            <OpenPolygon
               paths={path}
               options={{
                 fillColor: "#7c3aed",
@@ -211,23 +197,12 @@ function PreventionZonePathMapInner({
           )}
           {locationSearchResult && (
             <>
-              <Marker
+              <OpenMarker
                 position={{ lat: locationSearchResult.lat, lng: locationSearchResult.lng }}
                 zIndex={8}
-                icon={
-                  typeof window !== "undefined" && window.google?.maps
-                    ? {
-                        path: window.google.maps.SymbolPath.CIRCLE,
-                        fillColor: "#4ade80",
-                        fillOpacity: 1,
-                        strokeColor: "#FFFFFF",
-                        strokeWeight: 2,
-                        scale: 10,
-                      }
-                    : undefined
-                }
+                icon={{ fillColor: "#4ade80", fillOpacity: 1, strokeColor: "#FFFFFF", strokeWeight: 2, scale: 10 }}
               />
-              <InfoWindow
+              <OpenPopup
                 position={{ lat: locationSearchResult.lat, lng: locationSearchResult.lng }}
                 onCloseClick={() => onCloseLocationSearch?.()}
               >
@@ -253,10 +228,10 @@ function PreventionZonePathMapInner({
                     </div>
                   )}
                 </div>
-              </InfoWindow>
+              </OpenPopup>
             </>
           )}
-        </GoogleMap>
+        </OpenMap>
   )
 
   if (isFullscreen) {
@@ -283,14 +258,12 @@ interface PreventionZonePathMapProps {
   /** Zone deja salvate — afișate gri ca să evitați suprapunerea cu conturul nou. */
   existingZones: PreventionZone[]
   showExistingLayers?: boolean
-  /** Dacă e setat (ex. din GoogleMapsLoader), nu se mai face fetch local al cheii. */
-  apiKey?: string | null
   variant?: "default" | "fullscreen"
   drawingEnabled?: boolean
-  onMapScriptReady?: (ready: boolean) => void
+  onMapReadyChange?: (ready: boolean) => void
   locationSearchResult?: PreventionZonePathMapInnerProps["locationSearchResult"]
   onCloseLocationSearch?: () => void
-  onMapReady?: (map: google.maps.Map) => void
+  onMapReady?: (map: OpenMapInstance) => void
 }
 
 export function PreventionZonePathMap({
@@ -298,56 +271,22 @@ export function PreventionZonePathMap({
   onPathChange,
   existingZones,
   showExistingLayers = true,
-  apiKey: apiKeyProp,
   variant = "default",
   drawingEnabled = true,
-  onMapScriptReady,
+  onMapReadyChange,
   locationSearchResult,
   onCloseLocationSearch,
   onMapReady,
 }: PreventionZonePathMapProps) {
-  const [apiKeyInternal, setApiKeyInternal] = useState<string | null>(null)
-
-  useEffect(() => {
-    if (apiKeyProp) return
-    const cached = typeof window !== "undefined" ? localStorage.getItem("mapsApiKey") : null
-    if (cached) setApiKeyInternal(cached)
-    let cancelled = false
-    void fetch("/api/maps-key", { cache: "no-store" })
-      .then((r) => r.json())
-      .then((data: { apiKey?: string; error?: string }) => {
-        if (cancelled || data.error || !data.apiKey) return
-        localStorage.setItem("mapsApiKey", data.apiKey)
-        setApiKeyInternal(data.apiKey)
-      })
-      .catch(() => {})
-    return () => {
-      cancelled = true
-    }
-  }, [apiKeyProp])
-
-  const apiKey = apiKeyProp ?? apiKeyInternal
-
-  if (!apiKey) {
-    return (
-      <Skeleton
-        className={
-          variant === "fullscreen" ? "h-full min-h-[240px] w-full" : "h-[min(420px,55vh)] w-full rounded-md"
-        }
-      />
-    )
-  }
-
   return (
     <PreventionZonePathMapInner
-      apiKey={apiKey}
       path={path}
       onPathChange={onPathChange}
       existingZones={existingZones}
       showExistingLayers={showExistingLayers}
       variant={variant}
       drawingEnabled={drawingEnabled}
-      onMapScriptReady={onMapScriptReady}
+      onMapReadyChange={onMapReadyChange}
       locationSearchResult={locationSearchResult}
       onCloseLocationSearch={onCloseLocationSearch}
       onMapReady={onMapReady}

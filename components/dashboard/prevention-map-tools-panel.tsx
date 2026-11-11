@@ -3,6 +3,8 @@
 import { useCallback, useMemo } from "react"
 import { Button } from "@/components/ui/button"
 import type { PreventionZone } from "@/types/prevention-zone"
+import { OpenLatLngBounds } from "@/components/open-map"
+import type { OpenMapInstance } from "@/types/open-map"
 import { MdUndo, MdClear, MdCenterFocusStrong } from "react-icons/md"
 
 export type PreventionMapToolsPanelProps = {
@@ -11,7 +13,7 @@ export type PreventionMapToolsPanelProps = {
   existingZones: PreventionZone[]
   showExistingLayers: boolean
   drawingEnabled: boolean
-  map: google.maps.Map | null
+  map: OpenMapInstance | null
 }
 
 /** Controale pentru harta de prevenire (legendă, instrucțiuni, centrare, undo) — folosit în sheet/modal, nu peste hartă. */
@@ -30,8 +32,8 @@ export function PreventionMapToolsPanel({
 
   const fitZoneInView = useCallback(
     (zone: PreventionZone) => {
-      if (!map || typeof window === "undefined" || !window.google?.maps) return
-      const bounds = new window.google.maps.LatLngBounds()
+      if (!map) return
+      const bounds = new OpenLatLngBounds()
       zone.path.forEach((p) => bounds.extend(p))
       map.fitBounds(bounds, 40)
     },

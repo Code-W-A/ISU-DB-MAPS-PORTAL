@@ -1,7 +1,8 @@
 "use client"
 
 import { useState, useEffect, useCallback, useRef } from "react"
-import { GoogleMap, useJsApiLoader, InfoWindow, MarkerClusterer } from "@react-google-maps/api"
+import { OpenMap, OpenPopup, OpenMarkerClusterer, OpenMarker } from "@/components/open-map"
+import type { OpenMapBounds, OpenMapInstance } from "@/types/open-map"
 import { Button } from "@/components/ui/button"
 import { Card, CardContent, CardDescription, CardFooter, CardHeader, CardTitle } from "@/components/ui/card"
 import { Badge } from "@/components/ui/badge"
@@ -34,111 +35,9 @@ const center = {
 const HYDRANTS_DATA_URL =
   "https://raw.githubusercontent.com/RaduPopescu95/isudb_maps_data/refs/heads/main/hidranti.json"
 
-// Opțiuni pentru clustering
-const clusterOptions = {
-  imagePath: "https://developers.google.com/maps/documentation/javascript/examples/markerclusterer/m",
-  gridSize: 50,
-  minimumClusterSize: 3,
-  maxZoom: 15,
-}
+const clusterOptions = { gridSize: 50, minimumClusterSize: 3, maxZoom: 15 }
 
-// Componenta personalizată pentru marker
-const CustomMarker = ({ position, onClick, clusterer }) => {
-  const markerRef = useRef(null)
-  const [marker, setMarker] = useState(null)
-
-  useEffect(() => {
-    if (!window.google) return
-
-    // Creăm un marker standard
-    const newMarker = new window.google.maps.Marker({
-      position,
-      icon: {
-        path: window.google.maps.SymbolPath.CIRCLE,
-        scale: 0, // Facem markerul invizibil
-      },
-    })
-
-    // Adăugăm markerul la clusterer
-    if (clusterer) {
-      clusterer.addMarker(newMarker)
-    }
-
-    // Adăugăm listener pentru click
-    newMarker.addListener("click", onClick)
-
-    // Salvăm referința la marker
-    setMarker(newMarker)
-    markerRef.current = newMarker
-
-    // Cleanup la unmount
-    return () => {
-      if (markerRef.current) {
-        window.google.maps.event.clearInstanceListeners(markerRef.current)
-        if (clusterer) {
-          clusterer.removeMarker(markerRef.current)
-        }
-        markerRef.current.setMap(null)
-      }
-    }
-  }, [position, onClick, clusterer])
-
-  // Adăugăm un overlay pentru a afișa iconița MdFireHydrantAlt
-  useEffect(() => {
-    if (!marker || !window.google) return
-
-    // Creăm un overlay personalizat
-    class HydrantOverlay extends window.google.maps.OverlayView {
-      div = null
-
-      constructor(marker) {
-        super()
-        this.marker = marker
-      }
-
-      onAdd() {
-        this.div = document.createElement("div")
-        this.div.style.position = "absolute"
-        this.div.style.cursor = "pointer"
-        this.div.innerHTML = `
-          <svg xmlns="http://www.w3.org/2000/svg" width="24" height="24" viewBox="0 0 24 24" fill="#2563eb">
-            <path d="M21 13h-1V4h-6v4h-4V4H4v9H3c-.6 0-1 .4-1 1v5h2v-3h16v3h2v-5c0-.6-.4-1-1-1zm-11-2c0-1.1.9-2 2-2s2 .9 2 2-.9 2-2 2-2-.9-2-2z"/>
-          </svg>
-        `
-        this.div.style.transform = "translate(-50%, -50%)"
-
-        const panes = this.getPanes()
-        panes.overlayMouseTarget.appendChild(this.div)
-      }
-
-      draw() {
-        const position = this.getProjection().fromLatLngToDivPixel(this.marker.getPosition())
-        if (position) {
-          this.div.style.left = position.x + "px"
-          this.div.style.top = position.y + "px"
-        }
-      }
-
-      onRemove() {
-        if (this.div) {
-          this.div.parentNode.removeChild(this.div)
-          this.div = null
-        }
-      }
-    }
-
-    // Creăm și adăugăm overlay-ul
-    const overlay = new HydrantOverlay(marker)
-    overlay.setMap(marker.getMap())
-
-    // Cleanup la unmount
-    return () => {
-      overlay.setMap(null)
-    }
-  }, [marker])
-
-  return null
-}
+const HYDRANT_MARKER_ICON = `data:image/svg+xml,${encodeURIComponent('<svg xmlns="http://www.w3.org/2000/svg" width="24" height="24" viewBox="0 0 24 24"><path fill="#2563eb" d="M21 13h-1V4h-6v4h-4V4H4v9H3c-.6 0-1 .4-1 1v5h2v-3h16v3h2v-5c0-.6-.4-1-1-1zm-11-2c0-1.1.9-2 2-2s2 .9 2 2-.9 2-2 2-2-.9-2-2z"/></svg>')}`
 
 export function MapContainer() {
   const { user } = useAuth()
@@ -146,37 +45,12 @@ export function MapContainer() {
   const [visibleHydrants, setVisibleHydrants] = useState<Hydrant[]>([])
   const [selectedHydrant, setSelectedHydrant] = useState<Hydrant | null>(null)
   const [isLoading, setIsLoading] = useState(true)
-  const [mapRef, setMapRef] = useState(null)
-  const [mapBounds, setMapBounds] = useState(null)
+  const [mapRef, setMapRef] = useState<OpenMapInstance | null>(null)
+  const [mapBounds, setMapBounds] = useState<OpenMapBounds | null>(null)
   const [zoom, setZoom] = useState(14)
-  const [apiKey, setApiKey] = useState<string>("")
-  const [apiKeyLoaded, setApiKeyLoaded] = useState<boolean>(false)
   const [logoutDialogOpen, setLogoutDialogOpen] = useState(false)
 
-  // Load Google Maps API key from server
-  useEffect(() => {
-    async function fetchApiKey() {
-      try {
-        const res = await fetch("/api/maps-key")
-        const data = await res.json()
-        if (data.apiKey) {
-          setApiKey(data.apiKey)
-          setApiKeyLoaded(true)
-        } else {
-          console.error("No API key returned from server")
-        }
-      } catch (error) {
-        console.error("Error fetching Maps API key:", error)
-      }
-    }
-    fetchApiKey()
-  }, [])
-
-  const { isLoaded } = useJsApiLoader({
-    id: "google-map-script",
-    googleMapsApiKey: apiKey,
-    ...(apiKeyLoaded ? {} : { preventGoogleFontsLoading: true }),
-  })
+  const isLoaded = true
 
   // Încărcăm datele hidranților și implementăm caching
   useEffect(() => {
@@ -232,8 +106,7 @@ export function MapContainer() {
 
       // Verificăm dacă coordonatele sunt în limitele hărții
       try {
-        const latLng = new window.google.maps.LatLng(lat, lng)
-        return mapBounds.contains(latLng)
+        return mapBounds.contains({ lat, lng })
       } catch (e) {
         return false
       }
@@ -264,7 +137,7 @@ export function MapContainer() {
   }
 
   // Funcții pentru gestionarea hărții
-  const onMapLoad = useCallback((map) => {
+  const onMapLoad = useCallback((map: OpenMapInstance) => {
     setMapRef(map)
   }, [])
 
@@ -278,7 +151,7 @@ export function MapContainer() {
     setZoom(mapRef.getZoom())
   }, [mapRef])
 
-  if (!apiKeyLoaded || !isLoaded || isLoading) {
+  if (!isLoaded || isLoading) {
     return (
       <>
         <div className="p-4">
@@ -320,7 +193,7 @@ export function MapContainer() {
         </div>
       </div>
       <div className="flex-1 relative">
-        <GoogleMap
+        <OpenMap
           mapContainerStyle={mapContainerStyle}
           center={center}
           zoom={14}
@@ -334,11 +207,11 @@ export function MapContainer() {
           onZoomChanged={onZoomChanged}
         >
           {mapRef && (
-            <MarkerClusterer options={clusterOptions}>
+            <OpenMarkerClusterer options={clusterOptions}>
               {(clusterer) => (
                 <>
                   {visibleHydrants.map((hydrant, index) => (
-                    <CustomMarker
+                    <OpenMarker
                       key={`${hydrant.Localizare.Latitudine}-${hydrant.Localizare.Longitudine}-${index}`}
                       position={{
                         lat: Number.parseFloat(hydrant.Localizare.Latitudine),
@@ -346,15 +219,16 @@ export function MapContainer() {
                       }}
                       onClick={() => setSelectedHydrant(hydrant)}
                       clusterer={clusterer}
+                      icon={{ url: HYDRANT_MARKER_ICON, scaledSize: { width: 24, height: 24 } }}
                     />
                   ))}
                 </>
               )}
-            </MarkerClusterer>
+            </OpenMarkerClusterer>
           )}
 
           {selectedHydrant && (
-            <InfoWindow
+            <OpenPopup
               position={{
                 lat: Number.parseFloat(selectedHydrant.Localizare.Latitudine),
                 lng: Number.parseFloat(selectedHydrant.Localizare.Longitudine),
@@ -410,9 +284,9 @@ export function MapContainer() {
                   </Button>
                 </CardFooter>
               </Card>
-            </InfoWindow>
+            </OpenPopup>
           )}
-        </GoogleMap>
+        </OpenMap>
       </div>
     </div>
     <LogoutConfirmDialog open={logoutDialogOpen} onOpenChange={setLogoutDialogOpen} />

@@ -74,9 +74,8 @@ html:has(.map-shell) body {
   overscroll-behavior: none;
 }
 
-/* Google Maps: fără pan-x/pan-y restrictiv; none = twist/rotate merge la API */
-.gm-style,
-.gm-style > div {
+#map-container .maplibregl-canvas-container,
+#map-container .maplibregl-canvas {
   touch-action: none !important;
 }
 
@@ -105,12 +104,8 @@ html:has(.map-shell) body {
   }
 }
 
-/* Make Google Maps controls work properly */
-.gm-control-active,
-.gm-fullscreen-control,
-.gm-svpc,
-.gm-style-mtc,
-.gmnoprint {
+.maplibregl-ctrl,
+.maplibregl-ctrl button {
   pointer-events: auto !important;
 }
 

@@ -2,7 +2,7 @@
 
 import { memo } from "react"
 import { Button } from "@/components/ui/button"
-import { MdMyLocation, MdFireHydrantAlt, MdFullscreen, MdMap, MdSatellite, MdLayers, MdTerrain } from "react-icons/md"
+import { MdMyLocation, MdFireHydrantAlt, MdFullscreen, MdMap, MdDarkMode, MdLayers, MdTerrain } from "react-icons/md"
 import { MobileFilterPopup } from "@/components/mobile-filter-popup"
 import { useMobile } from "@/hooks/use-mobile"
 import type { HydrantAttributeFilters } from "@/lib/hydrant-attribute-filters"
@@ -66,9 +66,9 @@ function MobileMapControlsComponent({
         {/* Map type toggle */}
         <Button variant="ghost" size="icon" className="h-10 w-10 rounded-full" onClick={onToggleMapType} type="button">
           {mapType === "roadmap" && <MdMap size={20} />}
-          {mapType === "satellite" && <MdSatellite size={20} />}
-          {mapType === "hybrid" && <MdLayers size={20} />}
-          {mapType === "terrain" && <MdTerrain size={20} />}
+          {mapType === "dark" && <MdDarkMode size={20} />}
+          {mapType === "bright" && <MdLayers size={20} />}
+          {mapType === "positron" && <MdTerrain size={20} />}
         </Button>
 
         {/* Location button */}

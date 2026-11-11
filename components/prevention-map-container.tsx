@@ -3,7 +3,7 @@
 import { useEffect, useState } from "react"
 import Link from "next/link"
 import { useAuth } from "@/components/auth-provider"
-import { GoogleMapsLoader } from "@/components/google-maps-loader"
+import { MapShell } from "@/components/map-shell"
 import { LogoutConfirmDialog } from "@/components/logout-confirm-dialog"
 import { MapLocationSearchProvider } from "@/components/map-location-search-bridge"
 import { PreventionFullPageMap } from "@/components/prevention-full-page-map"
@@ -27,7 +27,7 @@ function PreventionMapGml({
   const nav = useMapAppNavPermissions(user, "preventionOrTool")
   return (
     <MapLocationSearchProvider>
-      <GoogleMapsLoader
+      <MapShell
         variant="prevention"
         onSignOut={onSignOut}
         userEmail={userEmail}
@@ -40,7 +40,7 @@ function PreventionMapGml({
         showIsuNotesLink={nav.mapToolLinks.showIsuNotesLink}
       >
         <PreventionFullPageMap access={access} allUsers={allUsers} />
-      </GoogleMapsLoader>
+      </MapShell>
     </MapLocationSearchProvider>
   )
 }

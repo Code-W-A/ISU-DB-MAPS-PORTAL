@@ -15,16 +15,16 @@ jest.mock("@/hooks/use-map-app-nav-permissions", () => ({ useMapAppNavPermission
   mapToolLinks: { showCatdLink: mockCatdAccess, showIndrumatorLink: false, showProcesVerbalLink: false, showAdrLink: false, showLegislatieLink: false, showIsuNotesLink: false } }) }))
 jest.mock("@/components/logout-confirm-dialog", () => ({ LogoutConfirmDialog: () => null }))
 jest.mock("@/lib/catd-client", () => ({ catdRequest: jest.fn() }))
-jest.mock("@react-google-maps/api", () => {
+jest.mock("@/components/open-map", () => {
   const React = require("react")
   const instance = { fitBounds: jest.fn(), panTo: (...args: unknown[]) => mockPanTo(...args), setZoom: (...args: unknown[]) => mockZoom(...args), getZoom: () => 10 }
   return {
-    useJsApiLoader: () => ({ isLoaded: true }),
-    GoogleMap: ({ children, onLoad }: any) => { React.useEffect(() => { onLoad(instance) }, [onLoad]); return <div data-testid="catd-map">{children}</div> },
-    Circle: ({ radius }: any) => <div data-testid="location-accuracy" data-radius={radius} />,
-    MarkerClusterer: ({ children }: any) => children({}),
-    Marker: ({ title, onClick }: any) => <button onClick={onClick}>{title}</button>,
-    InfoWindow: ({ children, onCloseClick }: any) => <div role="dialog"><button onClick={onCloseClick}>Închide fișa</button>{children}</div>,
+    OpenMap: ({ children, onLoad }: any) => { React.useEffect(() => { onLoad(instance) }, [onLoad]); return <div data-testid="catd-map">{children}</div> },
+    OpenCircle: ({ radius }: any) => <div data-testid="location-accuracy" data-radius={radius} />,
+    OpenMarkerClusterer: ({ children }: any) => children({}),
+    OpenMarker: ({ title, onClick }: any) => <button onClick={onClick}>{title}</button>,
+    OpenPopup: ({ children, onCloseClick }: any) => <div role="dialog"><button onClick={onCloseClick}>Închide fișa</button>{children}</div>,
+    createOpenMapBounds: () => ({ extend: jest.fn(), toArray: () => [[0, 0], [1, 1]] }),
   }
 })
 const data: CatdReadResult = {
@@ -45,8 +45,7 @@ beforeEach(() => {
   jest.clearAllMocks(); mockCatdAccess = true
   Object.defineProperty(navigator, "geolocation", { configurable: true, value: undefined })
   request.mockResolvedValue(data)
-  global.fetch = jest.fn().mockResolvedValue({ ok: true, json: async () => ({ apiKey: "maps-test" }) })
-  ;(global.google.maps as any).LatLngBounds = class { extend() {} }
+  global.fetch = jest.fn().mockResolvedValue({ ok: true, json: async () => ({}) })
 })
 test("permission denial prevents rendering and fetching CATD data", async () => {
   mockCatdAccess = false

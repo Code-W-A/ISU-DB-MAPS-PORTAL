@@ -9,45 +9,41 @@ function renderMap(ui: React.ReactElement) {
   return render(<MapLocationSearchProvider>{ui}</MapLocationSearchProvider>)
 }
 
-// Mock the Google Maps API
-jest.mock("@react-google-maps/api", () => {
-  const originalModule = jest.requireActual("@react-google-maps/api")
+// Mock the MapLibre wrapper.
+jest.mock("@/components/open-map", () => {
+  const React = require("react")
 
   return {
-    ...originalModule,
-    GoogleMap: ({ children, onLoad }) => {
+    OpenMap: ({ children, onLoad }) => {
       // Call onLoad with a mock map instance
       React.useEffect(() => {
         if (onLoad) {
           onLoad({
-            getBounds: () => ({
-              contains: () => true,
-            }),
+            getBounds: () => ({ contains: () => true, getNorthEast: () => ({ lat: 90, lng: 180 }), getSouthWest: () => ({ lat: -90, lng: -180 }) }),
             getZoom: () => 14,
+            getCenter: () => ({ lat: 44.93, lng: 25.45 }),
             panTo: jest.fn(),
             setZoom: jest.fn(),
+            fitBounds: jest.fn(),
           })
         }
       }, [onLoad])
 
-      return <div data-testid="google-map">{children}</div>
+      return <div data-testid="open-map">{children}</div>
     },
-    useJsApiLoader: () => ({
-      isLoaded: true,
-      loadError: null,
-    }),
-    InfoWindow: ({ children, onCloseClick }) => (
+    OpenPopup: ({ children, onCloseClick }) => (
       <div data-testid="info-window">
         {children}
         <button onClick={onCloseClick}>Close</button>
       </div>
     ),
-    MarkerClusterer: ({ children }) => children({ addMarker: jest.fn(), removeMarker: jest.fn() }),
-    Marker: ({ onClick, position }) => (
+    OpenMarkerClusterer: ({ children }) => children({ addMarker: jest.fn(), removeMarker: jest.fn() }),
+    OpenMarker: ({ onClick, position }) => (
       <div data-testid="marker" data-lat={position?.lat} data-lng={position?.lng} onClick={onClick}></div>
     ),
-    Polygon: () => <div data-testid="polygon"></div>,
-    Circle: () => <div data-testid="circle"></div>,
+    OpenPolygon: () => <div data-testid="polygon"></div>,
+    OpenCircle: () => <div data-testid="circle"></div>,
+    createOpenMapBounds: () => ({ extend: jest.fn(), toArray: () => [[0, 0], [1, 1]] }),
   }
 })
 

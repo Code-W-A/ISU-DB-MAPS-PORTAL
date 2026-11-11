@@ -1,7 +1,8 @@
 "use client"
 
 import { useCallback, useEffect, useMemo, useRef, useState } from "react"
-import { GoogleMap, Circle, Marker, MarkerClusterer, useJsApiLoader, type Libraries } from "@react-google-maps/api"
+import { OpenMap, OpenCircle, OpenMarker, OpenMarkerClusterer, createOpenMapBounds } from "@/components/open-map"
+import type { OpenMapInstance } from "@/types/open-map"
 import { ChevronDown, LocateFixed, MapPin, Navigation, RotateCw, Search, SlidersHorizontal, X } from "lucide-react"
 import { CatdFiltersPanel } from "@/components/catd-filters"
 import { CatdHydrantDetails } from "@/components/catd-hydrant-details"
@@ -14,18 +15,16 @@ import { Button } from "@/components/ui/button"
 import { catdRequest } from "@/lib/catd-client"
 import { catdValue, type CatdHydrant, type CatdReadResult } from "@/lib/catd"
 
-const libraries: Libraries = ["places"]
 const mapStyle = { width: "100%", height: "100%" }
 const defaultCenter = { lat: 44.93, lng: 25.45 }
 const mapOptions = { gestureHandling: "greedy" as const, streetViewControl: false, mapTypeControl: true, fullscreenControl: false, clickableIcons: false }
 
-function CatdMap({ apiKey, data, filtered, focus, userLocation, onSelect, onMapClick }: {
-  apiKey: string; data: CatdReadResult; filtered: CatdHydrant[]; focus: CatdMapFocus | null; userLocation: CatdUserLocation | null; onSelect: (value: CatdHydrant | null) => void; onMapClick: () => void
+function CatdMap({ data, filtered, focus, userLocation, onSelect, onMapClick }: {
+  data: CatdReadResult; filtered: CatdHydrant[]; focus: CatdMapFocus | null; userLocation: CatdUserLocation | null; onSelect: (value: CatdHydrant | null) => void; onMapClick: () => void
 }) {
-  const { isLoaded, loadError } = useJsApiLoader({ id: "google-map-script", googleMapsApiKey: apiKey, libraries, version: "weekly" })
-  const [map, setMap] = useState<google.maps.Map | null>(null)
-  const fitMap = useCallback((instance: google.maps.Map) => {
-    const bounds = new google.maps.LatLngBounds()
+  const [map, setMap] = useState<OpenMapInstance | null>(null)
+  const fitMap = useCallback((instance: OpenMapInstance) => {
+    const bounds = createOpenMapBounds()
     for (const hydrant of data.hydrants) bounds.extend(hydrant.position)
     instance.fitBounds(bounds)
     setMap(instance)
@@ -33,7 +32,7 @@ function CatdMap({ apiKey, data, filtered, focus, userLocation, onSelect, onMapC
   useEffect(() => {
     if (!map || !focus) return
     if (focus.kind === "nearest" && catdDistanceMeters(focus.origin, focus.position) > 10) {
-      const bounds = new google.maps.LatLngBounds()
+      const bounds = createOpenMapBounds()
       bounds.extend(focus.origin); bounds.extend(focus.position)
       map.fitBounds(bounds, 64)
     } else {
@@ -42,28 +41,25 @@ function CatdMap({ apiKey, data, filtered, focus, userLocation, onSelect, onMapC
     }
   }, [map, focus])
   const markerIcons = useMemo(() => {
-    if (!isLoaded) return null
-    const icon = (status: unknown) => ({ url: catdHydrantStatus(status).icon, scaledSize: new google.maps.Size(36, 44), anchor: new google.maps.Point(18, 43) })
+    const icon = (status: unknown) => ({ url: catdHydrantStatus(status).icon, scaledSize: { width: 36, height: 44 }, anchor: { x: 18, y: 43 } })
     return { functional: icon("F"), nonfunctional: icon("N"), unknown: icon(null) }
-  }, [isLoaded])
-  if (loadError) return <p role="alert" className="p-4">Harta Google nu poate fi încărcată. Reîncărcați pagina.</p>
-  if (!isLoaded) return <p role="status" className="p-4">Se încarcă harta…</p>
+  }, [])
   return (
-    <GoogleMap mapContainerStyle={mapStyle} center={defaultCenter} zoom={10} options={mapOptions} onLoad={fitMap} onClick={onMapClick}>
+    <OpenMap mapContainerStyle={mapStyle} center={defaultCenter} zoom={10} options={mapOptions} onLoad={fitMap} onClick={onMapClick}>
       {userLocation && <>
-        <Circle center={userLocation.position} radius={userLocation.accuracy} options={{ fillColor: "#2563eb", fillOpacity: 0.08, strokeColor: "#2563eb", strokeOpacity: 0.25, strokeWeight: 1, clickable: false }} />
-        <Marker position={userLocation.position} title="Locația ta" zIndex={10_000}
-          icon={{ path: google.maps.SymbolPath.CIRCLE, scale: 9, fillOpacity: 1, fillColor: "#2563eb", strokeColor: "#ffffff", strokeWeight: 3 }} />
+        <OpenCircle center={userLocation.position} radius={userLocation.accuracy} options={{ fillColor: "#2563eb", fillOpacity: 0.08, strokeColor: "#2563eb", strokeOpacity: 0.25, strokeWeight: 1, clickable: false }} />
+        <OpenMarker position={userLocation.position} title="Locația ta" zIndex={10_000}
+          icon={{ scale: 9, fillOpacity: 1, fillColor: "#2563eb", strokeColor: "#ffffff", strokeWeight: 3 }} />
       </>}
-      <MarkerClusterer>
+      <OpenMarkerClusterer>
         {(clusterer) => <>{filtered.map((hydrant) => (
-          <Marker key={hydrant.id} position={hydrant.position} clusterer={clusterer}
+          <OpenMarker key={hydrant.id} position={hydrant.position} clusterer={clusterer}
             title={`${String(hydrant.attributes.cod_unic_identificare ?? hydrant.id)} · ${catdHydrantStatus(hydrant.attributes.status).label}`}
             icon={markerIcons?.[catdHydrantStatus(hydrant.attributes.status).key]}
             onClick={() => onSelect(hydrant)} />
         ))}</>}
-      </MarkerClusterer>
-    </GoogleMap>
+      </OpenMarkerClusterer>
+    </OpenMap>
   )
 }
 
@@ -71,9 +67,7 @@ function CatdMap({ apiKey, data, filtered, focus, userLocation, onSelect, onMapC
 export function CatdContent() {
   const { user } = useAuth()
   const [data, setData] = useState<CatdReadResult | null>(null)
-  const [apiKey, setApiKey] = useState<string | null>(null)
   const [error, setError] = useState("")
-  const [mapsError, setMapsError] = useState("")
   const [loading, setLoading] = useState(true)
   const [attempt, setAttempt] = useState(0)
   const [search, setSearch] = useState("")
@@ -93,16 +87,11 @@ export function CatdContent() {
   useEffect(() => {
     if (!user) return
     const controller = new AbortController()
-    setLoading(true); setError(""); setMapsError(""); setSelected(null)
+    setLoading(true); setError(""); setSelected(null)
     void catdRequest<CatdReadResult>(user, "hydrants", "GET", controller.signal)
       .then((value) => { if (!controller.signal.aborted) setData(value) })
       .catch((reason) => { if (!controller.signal.aborted) { setData(null); setError(reason.message) } })
       .finally(() => { if (!controller.signal.aborted) setLoading(false) })
-    void fetch("/api/maps-key", { signal: controller.signal }).then(async (response) => {
-      const result = await response.json()
-      if (!response.ok || typeof result.apiKey !== "string") throw new Error("Cheia Google Maps nu este disponibilă.")
-      if (!controller.signal.aborted) setApiKey(result.apiKey)
-    }).catch((reason) => { if (!controller.signal.aborted) setMapsError(reason.message) })
     return () => controller.abort()
   }, [user, attempt])
 
@@ -171,7 +160,6 @@ export function CatdContent() {
       </div>
       {data?.source === "firebase" && <p role="status" className="rounded-lg bg-amber-50 p-2 text-xs text-amber-900 dark:bg-amber-950 dark:text-amber-200">CATD nu a furnizat un set complet de date. Este afișată ultima copie salvată în Firebase.</p>}
       {error && <p role="alert" className="text-sm text-destructive">{error}</p>}
-      {mapsError && <p role="alert" className="text-sm text-destructive">{mapsError}</p>}
       {loading && <p role="status" className="text-sm text-muted-foreground">Se verifică datele CATD…</p>}
       {data && <>
         <div className="flex items-center gap-2">
@@ -220,7 +208,7 @@ export function CatdContent() {
       </>}
     </section>
     <div className="relative min-h-0 flex-1" aria-label="Harta hidranților CATD">
-      {data && apiKey && <CatdMap apiKey={apiKey} data={data} filtered={filtered} focus={mapFocus} userLocation={location} onSelect={selectHydrant} onMapClick={() => setSearchOpen(false)} />}
+      {data && <CatdMap data={data} filtered={filtered} focus={mapFocus} userLocation={location} onSelect={selectHydrant} onMapClick={() => setSearchOpen(false)} />}
       {data && <div className="absolute bottom-10 left-3 right-3 z-10 flex flex-col items-start gap-2 sm:right-auto sm:max-w-sm">
         {(nearestError || locationError || locating || location) && <p role="status" className={`max-w-full rounded-xl border bg-background/95 px-3 py-2 text-xs leading-relaxed shadow-sm ${nearestError || locationError ? "text-amber-800 dark:text-amber-300" : "text-muted-foreground"}`}>
           {nearestError || locationError || (locating ? "Se caută poziția ta. Permite accesul la locație dacă browserul solicită acest lucru." : `Poziția ta · precizie ±${Math.ceil(location!.accuracy)} m`)}

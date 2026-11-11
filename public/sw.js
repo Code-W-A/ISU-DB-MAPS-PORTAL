@@ -2,11 +2,10 @@ const CACHE_VERSION = "v5"
 const APP_SHELL_CACHE = `isu-maps-shell-${CACHE_VERSION}`
 const RUNTIME_CACHE = `isu-maps-runtime-${CACHE_VERSION}`
 const DATA_CACHE = `isu-maps-data-${CACHE_VERSION}`
-const API_CACHE = `isu-maps-api-${CACHE_VERSION}`
 const OFFLINE_URL = "/offline.html"
 
 const PRECACHE_ASSETS = ["/", OFFLINE_URL, "/images/isu-logo.png", "/manifest.json"]
-const KNOWN_CACHES = [APP_SHELL_CACHE, RUNTIME_CACHE, DATA_CACHE, API_CACHE]
+const KNOWN_CACHES = [APP_SHELL_CACHE, RUNTIME_CACHE, DATA_CACHE]
 
 function isMapDataRequest(url) {
   const isGitHubRawMapData =
@@ -128,11 +127,6 @@ self.addEventListener("fetch", (event) => {
   // CATD is authorized per account. Never serve its API from the browser cache.
   if (requestUrl.origin === self.location.origin && requestUrl.pathname.startsWith("/api/catd/")) {
     event.respondWith(fetch(event.request))
-    return
-  }
-
-  if (requestUrl.origin === self.location.origin && requestUrl.pathname === "/api/maps-key") {
-    event.respondWith(networkFirst(event.request, API_CACHE))
     return
   }
 

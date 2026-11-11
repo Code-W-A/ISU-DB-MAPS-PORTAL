@@ -9,34 +9,31 @@ function renderWithSearchBridge(ui: React.ReactElement) {
   return render(<MapLocationSearchProvider>{ui}</MapLocationSearchProvider>)
 }
 
-// Mock the Google Maps API
-jest.mock("@react-google-maps/api", () => ({
-  GoogleMap: ({ children, onLoad }) => {
+// Mock the MapLibre wrapper.
+jest.mock("@/components/open-map", () => ({
+  OpenMap: ({ children, onLoad }) => {
     // Call onLoad with a mock map instance
     React.useEffect(() => {
       if (onLoad) {
         onLoad({
-          getBounds: () => ({
-            contains: () => true,
-          }),
+          getBounds: () => ({ contains: () => true, getNorthEast: () => ({ lat: 90, lng: 180 }), getSouthWest: () => ({ lat: -90, lng: -180 }) }),
           getZoom: () => 14,
+          getCenter: () => ({ lat: 44.93, lng: 25.45 }),
           panTo: jest.fn(),
           setZoom: jest.fn(),
+          fitBounds: jest.fn(),
         })
       }
     }, [onLoad])
 
-    return <div data-testid="google-map">{children}</div>
+    return <div data-testid="open-map">{children}</div>
   },
-  useJsApiLoader: () => ({
-    isLoaded: true,
-    loadError: null,
-  }),
-  InfoWindow: ({ children }) => <div data-testid="info-window">{children}</div>,
-  MarkerClusterer: ({ children }) => children({ addMarker: jest.fn(), removeMarker: jest.fn() }),
-  Marker: ({ onClick }) => <div data-testid="marker" onClick={onClick}></div>,
-  Polygon: () => <div data-testid="polygon"></div>,
-  Circle: () => <div data-testid="circle"></div>,
+  OpenPopup: ({ children }) => <div data-testid="info-window">{children}</div>,
+  OpenMarkerClusterer: ({ children }) => children({ addMarker: jest.fn(), removeMarker: jest.fn() }),
+  OpenMarker: ({ onClick }) => <div data-testid="marker" onClick={onClick}></div>,
+  OpenPolygon: () => <div data-testid="polygon"></div>,
+  OpenCircle: () => <div data-testid="circle"></div>,
+  createOpenMapBounds: () => ({ extend: jest.fn(), toArray: () => [[0, 0], [1, 1]] }),
 }))
 
 // Mock the hooks
@@ -98,27 +95,11 @@ describe("Map Component", () => {
     jest.clearAllMocks()
   })
 
-  test("renders loading skeleton initially", () => {
-    // Override isLoaded to false for this test
-    const mockUseJsApiLoader = {
-      isLoaded: false,
-      loadError: null,
-    }
-
-    jest.mock("@react-google-maps/api", () => ({
-      ...jest.requireActual("@react-google-maps/api"),
-      useJsApiLoader: () => mockUseJsApiLoader,
-    }))
-
-    renderWithSearchBridge(<Map />)
-    expect(screen.getByRole("status")).toBeInTheDocument()
-  })
-
-  test("renders Google Map when loaded", async () => {
+  test("renders the OpenStreetMap layer", async () => {
     renderWithSearchBridge(<Map />)
 
     await waitFor(() => {
-      expect(screen.getByTestId("google-map")).toBeInTheDocument()
+      expect(screen.getByTestId("open-map")).toBeInTheDocument()
     })
   })
 

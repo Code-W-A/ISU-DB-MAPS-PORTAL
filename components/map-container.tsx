@@ -6,7 +6,7 @@ import { hasFullAccess } from "@/lib/role-service"
 import { MAIN_ADMIN_EMAIL } from "@/lib/map-tool-links"
 import { normalizeUserEmail } from "@/lib/user-role-utils"
 import { Map } from "@/components/map"
-import { GoogleMapsLoader } from "@/components/google-maps-loader"
+import { MapShell } from "@/components/map-shell"
 import { MapLocationSearchProvider } from "@/components/map-location-search-bridge"
 import { LogoutConfirmDialog } from "@/components/logout-confirm-dialog"
 import { useMapAppNavPermissions } from "@/hooks/use-map-app-nav-permissions"
@@ -43,7 +43,7 @@ export function MapContainer() {
 
   return (
     <MapLocationSearchProvider>
-      <GoogleMapsLoader
+      <MapShell
         onSignOut={handleSignOutRequest}
         userEmail={user?.email || ""}
         isAdmin={nav.hasDashboardAccess}
@@ -56,7 +56,7 @@ export function MapContainer() {
         showIsuNotesLink={nav.mapToolLinks.showIsuNotesLink}
       >
         <Map hasAccess={hasAccess} isAdmin={isAdminForMap} />
-      </GoogleMapsLoader>
+      </MapShell>
       <LogoutConfirmDialog open={logoutDialogOpen} onOpenChange={setLogoutDialogOpen} />
     </MapLocationSearchProvider>
   )

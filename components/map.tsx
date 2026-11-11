@@ -4,7 +4,8 @@ import React from "react"
 
 import type { FunctionComponent } from "react"
 import { useState, useEffect, useCallback, useRef, useMemo } from "react"
-import { GoogleMap, useJsApiLoader, InfoWindow, MarkerClusterer, Marker, Polygon, Circle } from "@react-google-maps/api"
+import { OpenMap, OpenPopup, OpenMarkerClusterer, OpenMarker, OpenPolygon, OpenCircle, type MapIcon } from "@/components/open-map"
+import type { OpenMapBounds, OpenMapInstance, MapSearchResult } from "@/types/open-map"
 import { Button } from "@/components/ui/button"
 import { Card, CardContent, CardDescription, CardFooter, CardHeader, CardTitle } from "@/components/ui/card"
 import { Badge } from "@/components/ui/badge"
@@ -12,7 +13,7 @@ import {
   MdMyLocation,
   MdFireHydrantAlt,
   MdMap,
-  MdSatellite,
+  MdDarkMode,
   MdFullscreen,
   MdLocationCity,
   MdDirections,
@@ -74,13 +75,6 @@ import {
 import { HydrantAttributeFilterControls } from "@/components/hydrant-attribute-filter-controls"
 import { getActiveReportedProblemLabels } from "@/lib/hydrant-report-processing"
 
-// Declare google variable
-declare global {
-  interface Window {
-    google: any
-  }
-}
-
 const MAP_LAYER_CACHE_KEYS = {
   hydrants: "map-layer-hydrants",
   primarii: "map-layer-primarii",
@@ -122,19 +116,14 @@ function writeStoredVisibleRaions(raions: string[]) {
 
 // Tipurile de hărți disponibile
 const MAP_TYPES = [
-  { id: "roadmap", name: "Hartă", icon: MdMap },
-  { id: "satellite", name: "Satelit", icon: MdSatellite },
-  { id: "hybrid", name: "Hibrid", icon: MdLayers },
-  { id: "terrain", name: "Teren", icon: MdTerrain },
+  { id: "roadmap", name: "Hartă standard", icon: MdMap },
+  { id: "bright", name: "Hartă luminoasă", icon: MdLayers },
+  { id: "positron", name: "Hartă deschisă", icon: MdTerrain },
+  { id: "dark", name: "Hartă întunecată", icon: MdDarkMode },
 ]
 
 // Opțiuni pentru clustering
-const clusterOptions = {
-  imagePath: "https://developers.google.com/maps/documentation/javascript/examples/markerclusterer/m",
-  gridSize: 50,
-  minimumClusterSize: 3,
-  maxZoom: 15,
-}
+const clusterOptions = { gridSize: 50, minimumClusterSize: 3, maxZoom: 15 }
 
 // Throttle function to limit the frequency of function calls
 function throttle<T extends (...args: any[]) => any>(func: T, limit: number): (...args: Parameters<T>) => void {
@@ -149,7 +138,6 @@ function throttle<T extends (...args: any[]) => any>(func: T, limit: number): (.
 }
 
 interface MapProps {
-  apiKey?: string
   hasAccess?: boolean
   isAdmin?: boolean
 }
@@ -302,30 +290,28 @@ function iconFromReactIcon(
   Icon: FunctionComponent<{ size?: number; color?: string }>,
   size = 26,
   color = "#2563eb",
-): google.maps.Icon | null {
-  if (!window.google || !window.google.maps) return null
-
+): MapIcon | null {
   const svgString = renderToStaticMarkup(<Icon size={size} color={color} />)
 
   return {
     url: `data:image/svg+xml;charset=UTF-8,${encodeURIComponent(svgString)}`,
-    scaledSize: new window.google.maps.Size(size, size),
-    anchor: new window.google.maps.Point(size / 2, size / 2),
+    scaledSize: { width: size, height: size },
+    anchor: { x: size / 2, y: size / 2 },
   }
 }
 
-export function Map({ apiKey = "", hasAccess = false, isAdmin = false }: MapProps) {
+export function Map({ hasAccess = false, isAdmin = false }: MapProps) {
   const [hydrants, setHydrants] = useState<Hydrant[]>([])
   const [visibleHydrantPoints, setVisibleHydrantPoints] = useState<HydrantPoint[]>([])
   const [selectedHydrant, setSelectedHydrant] = useState<Hydrant | null>(null)
   const [isLoading, setIsLoading] = useState(true)
-  const [mapRef, setMapRef] = useState<google.maps.Map | null>(null)
-  const [mapBounds, setMapBounds] = useState<google.maps.LatLngBounds | null>(null)
+  const [mapRef, setMapRef] = useState<OpenMapInstance | null>(null)
+  const [mapBounds, setMapBounds] = useState<OpenMapBounds | null>(null)
   const [zoom, setZoom] = useState(14)
-  const [hydrantIcon, setHydrantIcon] = useState<google.maps.Icon | null>(null)
-  const [primarieIcon, setPrimarieIcon] = useState<google.maps.Icon | null>(null)
-  const [subunitateIcon, setSubunitateIcon] = useState<google.maps.Icon | null>(null)
-  const [sevesoIcon, setSevesoIcon] = useState<google.maps.Icon | null>(null)
+  const [hydrantIcon, setHydrantIcon] = useState<MapIcon | null>(null)
+  const [primarieIcon, setPrimarieIcon] = useState<MapIcon | null>(null)
+  const [subunitateIcon, setSubunitateIcon] = useState<MapIcon | null>(null)
+  const [sevesoIcon, setSevesoIcon] = useState<MapIcon | null>(null)
   const [primarii, setPrimarii] = useState<Primarie[]>([])
   const [subunitati, setSubunitati] = useState<Subunitate[]>([])
   const [seveso, setSeveso] = useState<Seveso[]>([])
@@ -494,29 +480,11 @@ export function Map({ apiKey = "", hasAccess = false, isAdmin = false }: MapProp
 
   // Map options optimized for mobile
   const mapOptions = useMemo(
-    () => ({
-      mapTypeControl: !isMobile,
-      streetViewControl: !isMobile,
-      fullscreenControl: false,
-      zoomControl: !isMobile,
-      gestureHandling: "greedy",
-      draggable: true,
-      clickableIcons: false,
-      disableDefaultUI: isMobile,
-      mapTypeId: mapType,
-      tilt: isMobile || isLowEndDevice ? 0 : 45,
-      maxZoom: isLowEndDevice ? 18 : 20,
-    }),
+    () => ({ mapTypeId: mapType, maxZoom: isLowEndDevice ? 18 : 20, zoomControl: !isMobile }),
     [isMobile, mapType, isLowEndDevice],
   )
 
-  // Use the useJsApiLoader hook with the provided API key
-  const { isLoaded, loadError } = useJsApiLoader({
-    id: "google-map-script",
-    googleMapsApiKey: apiKey,
-    libraries: ["places"],
-    version: "weekly",
-  })
+  const isLoaded = true
 
   // Get user location (doar în context securizat — evită erori pe http://IP din LAN)
   useEffect(() => {
@@ -1068,7 +1036,7 @@ export function Map({ apiKey = "", hasAccess = false, isAdmin = false }: MapProp
 
   // Create marker icons
   useEffect(() => {
-    if (!isLoaded || !window.google || !window.google.maps) return
+    if (!isLoaded) return
 
     try {
       setHydrantIcon(iconFromReactIcon(MdFireHydrantAlt, 40, "#0000FF"))
@@ -1081,7 +1049,7 @@ export function Map({ apiKey = "", hasAccess = false, isAdmin = false }: MapProp
   }, [isLoaded])
 
   // Map event handlers with throttling
-  const onMapLoad = useCallback((map: google.maps.Map) => {
+  const onMapLoad = useCallback((map: OpenMapInstance) => {
     setMapRef(map)
   }, [])
 
@@ -1109,7 +1077,7 @@ export function Map({ apiKey = "", hasAccess = false, isAdmin = false }: MapProp
 
   // Handle map click
   const handleMapClick = useCallback(
-    (event: google.maps.MapMouseEvent) => {
+    (_event: { latLng: { lat: () => number; lng: () => number } }) => {
       // Reset info windows except for SEVESO when editing
       if (!isEditingSituatie) {
         setSelectedSeveso(null)
@@ -1126,7 +1094,7 @@ export function Map({ apiKey = "", hasAccess = false, isAdmin = false }: MapProp
   )
 
   const handleMapRightClick = useCallback(
-    (event: google.maps.MapMouseEvent) => {
+    (event: { latLng: { lat: () => number; lng: () => number } }) => {
       if (!event.latLng) return
 
       // Verificăm dacă utilizatorul este autentificat
@@ -1156,11 +1124,9 @@ export function Map({ apiKey = "", hasAccess = false, isAdmin = false }: MapProp
 
   // Handle location selection from search
   const handleLocationSelect = useCallback(
-    (place: google.maps.places.PlaceResult) => {
-      if (!place.geometry || !place.geometry.location) return
-
-      const lat = place.geometry.location.lat()
-      const lng = place.geometry.location.lng()
+    (place: MapSearchResult) => {
+      const lat = place.lat
+      const lng = place.lng
 
       // Center map on selected location
       if (mapRef) {
@@ -1175,7 +1141,7 @@ export function Map({ apiKey = "", hasAccess = false, isAdmin = false }: MapProp
       setSearchedLocationMarker({
         lat,
         lng,
-        address: place.formatted_address || place.name || "",
+        address: place.address || place.name || "",
         raion,
         showTooltip: true,
         ...(preventionZonesAccess !== "none" && user
@@ -1197,7 +1163,7 @@ export function Map({ apiKey = "", hasAccess = false, isAdmin = false }: MapProp
     [polygonData, mapRef, preventionZones, preventionZonesAccess, user],
   )
 
-  const { registerMapLocationSelectHandler, setMapsScriptReady } = useMapLocationSearchBridge()
+  const { registerMapLocationSelectHandler, setMapReady } = useMapLocationSearchBridge()
 
   useEffect(() => {
     registerMapLocationSelectHandler(handleLocationSelect)
@@ -1205,9 +1171,9 @@ export function Map({ apiKey = "", hasAccess = false, isAdmin = false }: MapProp
   }, [registerMapLocationSelectHandler, handleLocationSelect])
 
   useEffect(() => {
-    const ready = Boolean(typeof window !== "undefined" && isLoaded && window.google?.maps)
-    setMapsScriptReady(ready)
-  }, [isLoaded, setMapsScriptReady])
+    const ready = Boolean(mapRef)
+    setMapReady(ready)
+  }, [isLoaded, mapRef, setMapReady])
 
   // Get directions to a location
   const getDirections = useCallback(
@@ -1825,20 +1791,8 @@ export function Map({ apiKey = "", hasAccess = false, isAdmin = false }: MapProp
   }
 
   // Show error state
-  if (loadError) {
-    return (
-      <div className="flex flex-col items-center justify-center h-[calc(100vh-64px)]">
-        <h2 className="text-2xl font-bold text-red-500 mb-4">Eroare la încărcarea Google Maps</h2>
-        <p className="text-center mb-4">Nu s-a putut încărca Google Maps: {loadError.message}</p>
-        <Button onClick={() => window.location.reload()} type="button">
-          Reîncarcă pagina
-        </Button>
-      </div>
-    )
-  }
-
-  // Wait until Google Maps is loaded
-  if (!isLoaded || !window.google || !window.google.maps) {
+  // Keep the map area stable while map data is prepared.
+  if (!isLoaded) {
     return <Skeleton className="w-full h-[calc(100vh-64px)]" />
   }
 
@@ -1848,8 +1802,8 @@ export function Map({ apiKey = "", hasAccess = false, isAdmin = false }: MapProp
       id="map-container"
       ref={mapContainerRef}
     >
-      {isLoaded && window.google && (
-        <GoogleMap
+      {isLoaded && (
+        <OpenMap
           mapContainerStyle={mapContainerStyle}
           center={center}
           zoom={14}
@@ -1860,7 +1814,7 @@ export function Map({ apiKey = "", hasAccess = false, isAdmin = false }: MapProp
           onClick={handleMapClick}
           onRightClick={handleMapRightClick}
         >
-          {/* Polygon data - optimized for mobile */}
+          {/* OpenPolygon data - optimized for mobile */}
           {!loadingPolygons &&
             Object.entries(polygonData).map(([raionName, coordinates]) => {
               const raion = getRaionSlugFromPolygonKey(raionName)
@@ -1875,7 +1829,7 @@ export function Map({ apiKey = "", hasAccess = false, isAdmin = false }: MapProp
 
               const isSelectedRaion = selectedRaion === raion
 
-              // Polygon options
+              // OpenPolygon options
               const polygonOptions = {
                 fillColor: raionColors[raion] || "#FF0000",
                 fillOpacity: isSelectedRaion ? 0.5 : 0.4,
@@ -1887,7 +1841,7 @@ export function Map({ apiKey = "", hasAccess = false, isAdmin = false }: MapProp
               }
 
               return (
-                <Polygon
+                <OpenPolygon
                   key={raionName}
                   paths={coordinates}
                   options={polygonOptions}
@@ -1899,7 +1853,7 @@ export function Map({ apiKey = "", hasAccess = false, isAdmin = false }: MapProp
           {preventionZonesAccess !== "none" &&
             showPreventionZonesLayer &&
             preventionZones.map((zone) => (
-              <Polygon
+              <OpenPolygon
                 key={`prevention-zone-${zone.id}`}
                 paths={zone.path}
                 options={{
@@ -1920,7 +1874,7 @@ export function Map({ apiKey = "", hasAccess = false, isAdmin = false }: MapProp
             showSubunitati &&
             hasAccess &&
             subunitati.map((subunitate, index) => (
-              <Marker
+              <OpenMarker
                 key={`subunitate-${index}`}
                 position={{
                   lat: subunitate.coordinates.latitude,
@@ -1944,7 +1898,7 @@ export function Map({ apiKey = "", hasAccess = false, isAdmin = false }: MapProp
             showSeveso &&
             hasAccess &&
             seveso.map((loc, index) => (
-              <Marker
+              <OpenMarker
                 key={`seveso-${index}`}
                 position={{
                   lat: loc.coordinates.latitude,
@@ -1970,7 +1924,7 @@ export function Map({ apiKey = "", hasAccess = false, isAdmin = false }: MapProp
             allSituatiiSeveso
               .filter((situatie) => activeSituatii.includes(situatie.id))
               .map((situatie) => (
-                <Circle
+                <OpenCircle
                   key={`situatie-${situatie.id}`}
                   center={{
                     lat: situatie.coordonate.latitude,
@@ -2005,7 +1959,7 @@ export function Map({ apiKey = "", hasAccess = false, isAdmin = false }: MapProp
                   typeof primarie.coordinates.longitude === "number",
               )
               .map((primarie, index) => (
-                <Marker
+                <OpenMarker
                   key={`primarie-${index}`}
                   position={{
                     lat: primarie.coordinates.latitude,
@@ -2025,11 +1979,11 @@ export function Map({ apiKey = "", hasAccess = false, isAdmin = false }: MapProp
 
           {/* Hydrant markers with clustering */}
           {mapRef && hydrantIcon && showHydrants && visibleHydrantPoints.length > 0 && (
-            <MarkerClusterer options={clusterOptions}>
+            <OpenMarkerClusterer options={clusterOptions}>
               {(clusterer) => (
                 <>
                   {visibleHydrantPoints.map((hydrantPoint) => (
-                    <Marker
+                    <OpenMarker
                       key={hydrantPoint.markerKey}
                       position={{
                         lat: hydrantPoint.lat,
@@ -2049,15 +2003,15 @@ export function Map({ apiKey = "", hasAccess = false, isAdmin = false }: MapProp
                   ))}
                 </>
               )}
-            </MarkerClusterer>
+            </OpenMarkerClusterer>
           )}
 
           {/* User location marker */}
-          {userLocation && window.google && (
-            <Marker
+          {userLocation && (
+            <OpenMarker
               position={userLocation}
               icon={{
-                path: window.google.maps.SymbolPath.CIRCLE,
+                scale: 8,
                 fillColor: "#0047AB",
                 fillOpacity: 1,
                 strokeColor: "#FFFFFF",
@@ -2071,13 +2025,13 @@ export function Map({ apiKey = "", hasAccess = false, isAdmin = false }: MapProp
           {/* Searched location marker */}
           {searchedLocationMarker && (
             <>
-              <Marker
+              <OpenMarker
                 position={{
                   lat: searchedLocationMarker.lat,
                   lng: searchedLocationMarker.lng,
                 }}
                 icon={{
-                  path: window.google.maps.SymbolPath.CIRCLE,
+                  scale: 10,
                   fillColor: "#4ade80", // Green color
                   fillOpacity: 1,
                   strokeColor: "#FFFFFF",
@@ -2087,7 +2041,7 @@ export function Map({ apiKey = "", hasAccess = false, isAdmin = false }: MapProp
                 zIndex={6}
               />
               {!isMobile && searchedLocationMarker.showTooltip && (
-                <InfoWindow
+                <OpenPopup
                   position={{
                     lat: searchedLocationMarker.lat,
                     lng: searchedLocationMarker.lng,
@@ -2135,14 +2089,14 @@ export function Map({ apiKey = "", hasAccess = false, isAdmin = false }: MapProp
                       </div>
                     </CardContent>
                   </Card>
-                </InfoWindow>
+                </OpenPopup>
               )}
             </>
           )}
 
-          {/* InfoWindow for selected hydrant */}
+          {/* OpenPopup for selected hydrant */}
           {!isMobile && selectedHydrant && selectedHydrantPosition && (
-            <InfoWindow
+            <OpenPopup
               position={selectedHydrantPosition}
               onCloseClick={() => setSelectedHydrant(null)}
             >
@@ -2228,12 +2182,12 @@ export function Map({ apiKey = "", hasAccess = false, isAdmin = false }: MapProp
                   </Button>
                 </CardFooter>
               </Card>
-            </InfoWindow>
+            </OpenPopup>
           )}
 
-          {/* InfoWindow for selected primarie */}
+          {/* OpenPopup for selected primarie */}
           {!isMobile && selectedPrimarie && (
-            <InfoWindow
+            <OpenPopup
               position={{
                 lat: selectedPrimarie.coordinates.latitude,
                 lng: selectedPrimarie.coordinates.longitude,
@@ -2304,12 +2258,12 @@ export function Map({ apiKey = "", hasAccess = false, isAdmin = false }: MapProp
                   </Button>
                 </CardFooter>
               </Card>
-            </InfoWindow>
+            </OpenPopup>
           )}
 
-          {/* InfoWindow for selected subunitate */}
+          {/* OpenPopup for selected subunitate */}
           {!isMobile && selectedSubunitate && (
-            <InfoWindow
+            <OpenPopup
               position={{
                 lat: selectedSubunitate.coordinates.latitude,
                 lng: selectedSubunitate.coordinates.longitude,
@@ -2351,12 +2305,12 @@ export function Map({ apiKey = "", hasAccess = false, isAdmin = false }: MapProp
                   </Button>
                 </CardFooter>
               </Card>
-            </InfoWindow>
+            </OpenPopup>
           )}
 
-          {/* InfoWindow for selected SEVESO location */}
+          {/* OpenPopup for selected SEVESO location */}
           {!isMobile && selectedSeveso && (
-            <InfoWindow
+            <OpenPopup
               position={{
                 lat: selectedSeveso.coordinates.latitude,
                 lng: selectedSeveso.coordinates.longitude,
@@ -2523,9 +2477,9 @@ export function Map({ apiKey = "", hasAccess = false, isAdmin = false }: MapProp
                   </TabsContent>
                 </Tabs>
               </Card>
-            </InfoWindow>
+            </OpenPopup>
           )}
-        </GoogleMap>
+        </OpenMap>
       )}
 
       {isMobile && (
@@ -2882,7 +2836,7 @@ export function Map({ apiKey = "", hasAccess = false, isAdmin = false }: MapProp
         />
       )}
 
-      {/* Polygon controls (desktop) */}
+      {/* OpenPolygon controls (desktop) */}
       {!isMobile && showPolygonControls && (
         <div className="absolute top-4 right-4 z-10 bg-white/95 dark:bg-gray-800/95 backdrop-blur-sm rounded-lg shadow-lg">
           <PolygonControls
@@ -2895,7 +2849,7 @@ export function Map({ apiKey = "", hasAccess = false, isAdmin = false }: MapProp
         </div>
       )}
 
-      {/* Polygon + marker filters (mobile) */}
+      {/* OpenPolygon + marker filters (mobile) */}
       {isMobile && (
         <Sheet open={showPolygonControls} onOpenChange={setShowPolygonControls}>
           <SheetContent

@@ -42,46 +42,6 @@ Object.defineProperty(window, "IntersectionObserver", {
   value: MockIntersectionObserver,
 })
 
-// Mock window.google.maps
-window.google = {
-  maps: {
-    SymbolPath: {
-      CIRCLE: 0,
-    },
-    Size: class {
-      constructor(width, height) {
-        this.width = width
-        this.height = height
-      }
-    },
-    Point: class {
-      constructor(x, y) {
-        this.x = x
-        this.y = y
-      }
-    },
-    LatLng: class {
-      constructor(lat, lng) {
-        this.lat = lat
-        this.lng = lng
-      }
-      lat() {
-        return this.lat
-      }
-      lng() {
-        return this.lng
-      }
-    },
-    Map: class {},
-    Marker: class {},
-    InfoWindow: class {},
-    LatLngBounds: class {
-      contains() {
-        return true
-      }
-    },
-  },
-}
 }
 
 // Mock console.error to avoid cluttering test output
