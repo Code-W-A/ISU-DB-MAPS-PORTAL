@@ -3,12 +3,16 @@
 import React, { createContext, useCallback, useContext, useEffect, useMemo, useRef, useState } from "react"
 import MapLibreMap, { Marker as GLMarker, Popup, Source, Layer, NavigationControl, FullscreenControl, type MapRef, type MapLayerMouseEvent } from "react-map-gl/maplibre"
 import type { Map as MapLibre } from "maplibre-gl"
+import { setWorkerUrl } from "maplibre-gl"
 import Supercluster from "supercluster"
 import type { Feature, Point } from "geojson"
 import type { LngLat, OpenMapBounds, OpenMapInstance } from "@/types/open-map"
 import "maplibre-gl/dist/maplibre-gl.css"
 
 export const OPENFREEMAP_STYLE = "https://tiles.openfreemap.org/styles/liberty"
+// Next.js bundles the library into a hashed chunk, so its inferred worker URL
+// points at a file that does not exist. Serve the matching worker explicitly.
+setWorkerUrl("/maplibre/maplibre-gl-worker-6.17.0.mjs")
 type MapContextValue = { ref: React.MutableRefObject<MapRef | null>; instance: OpenMapInstance | null; viewport: { bbox: [number, number, number, number]; zoom: number } | null }
 const MapContext = createContext<MapContextValue>({ ref: { current: null }, instance: null, viewport: null })
 
